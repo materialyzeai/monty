@@ -54,11 +54,9 @@ class TestScratchDir:
         assert not os.path.exists(d)
         files = os.listdir(".")
         assert "scratch_text" in files
-
-        # We check that the pre-scratch file no longer exists (because it is
-        # deleted in the scratch)
-        assert "pre_scratch_text" not in files
         os.remove("scratch_text")
+
+        os.remove("pre_scratch_text")
 
     def test_with_copy_gzip(self):
         # We write a pre-scratch file.
@@ -84,37 +82,7 @@ class TestScratchDir:
             if f.endswith(".gz") and f not in init_gz_files:
                 os.remove(f)
         os.remove("pre_scratch_text")
-
-    def test_with_copy_nodelete(self):
-        # We write a pre-scratch file.
-        with open("pre_scratch_text", "w", encoding="utf-8") as f:
-            f.write("write")
-
-        with ScratchDir(
-            self.scratch_root,
-            copy_from_current_on_enter=True,
-            copy_to_current_on_exit=True,
-            delete_removed_files=False,
-        ) as d:
-            with open("scratch_text", "w", encoding="utf-8") as f:
-                f.write("write")
-            files = os.listdir(d)
-            assert "scratch_text" in files
-            assert "empty_file.txt" in files
-            assert "pre_scratch_text" in files
-
-            # We remove the pre-scratch file.
-            os.remove("pre_scratch_text")
-
-        # Make sure the tempdir is deleted.
-        assert not os.path.exists(d)
-        files = os.listdir(".")
-        assert "scratch_text" in files
-
-        # We check that the pre-scratch file DOES still exists
-        assert "pre_scratch_text" in files
         os.remove("scratch_text")
-        os.remove("pre_scratch_text")
 
     def test_no_copy(self):
         with ScratchDir(

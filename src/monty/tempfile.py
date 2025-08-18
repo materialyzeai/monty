@@ -13,7 +13,6 @@ from typing import TYPE_CHECKING
 from monty.shutil import gzip_dir, remove
 
 if TYPE_CHECKING:
-    from pathlib import Path
     from typing import ClassVar, Union
 
     from monty.shutil import PathLike
@@ -51,7 +50,6 @@ class ScratchDir:
         copy_from_current_on_enter: bool = False,
         copy_to_current_on_exit: bool = False,
         gzip_on_exit: bool = False,
-        delete_removed_files: bool = True,
     ) -> None:
         """
         Initializes scratch directory given a **root** path. There is no need
@@ -83,9 +81,6 @@ class ScratchDir:
             gzip_on_exit (bool): Whether to gzip the files generated in the
                 ScratchDir before copying them back.
                 Defaults to False.
-            delete_removed_files (bool): Whether to delete files in the cwd
-                that are removed from the tmp dir.
-                Defaults to True.
         """
         self.cwd: str = os.getcwd()
         self.rootpath: str | None = (
@@ -105,7 +100,6 @@ class ScratchDir:
         self.enter_copy: bool = copy_from_current_on_enter
         self.exit_copy: bool = copy_to_current_on_exit
         self.gzip_on_exit: bool = gzip_on_exit
-        self.delete_removed_files: bool = delete_removed_files
 
     def __enter__(self) -> str:
         tempdir: str = self.cwd
@@ -122,9 +116,6 @@ class ScratchDir:
     def __exit__(self, exc_type, exc_val, exc_tb) -> None:
         if not self.pass_through:
             if self.exit_copy:
-                files = set(os.listdir(self.tempdir))
-                orig_files = set(os.listdir(self.cwd))
-
                 # gzip files
                 if self.gzip_on_exit:
                     gzip_dir(self.tempdir)
@@ -174,12 +165,6 @@ class ScratchDir:
 
                 # copy files over
                 shutil.copytree(self.tempdir, self.cwd, dirs_exist_ok=True)
-
-                # Delete any files that are now gone
-                if self.delete_removed_files:
-                    for f in orig_files - files:
-                        fpath = os.path.join(self.cwd, f)
-                        remove(fpath)
 
             os.chdir(self.cwd)
             remove(self.tempdir)
