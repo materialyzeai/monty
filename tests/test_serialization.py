@@ -107,3 +107,10 @@ class TestSerial:
         new_d = loadfn("monte_test.jsonl.gz")
         assert all(new_d[i] == entry for i, entry in enumerate(d))
         assert all(isinstance(entry["obj"], toyMsonable) for entry in new_d)
+
+        new_d = loadfn("monte_test.jsonl.gz", cls=None)
+        assert all(
+            isinstance(entry["obj"], dict)
+            and toyMsonable.from_dict(entry["obj"]) == d[i]["obj"]
+            for i, entry in enumerate(new_d)
+        )
