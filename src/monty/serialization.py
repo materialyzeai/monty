@@ -21,12 +21,13 @@ except ImportError:
     msgpack = None
 
 if TYPE_CHECKING:
-    from pathlib import Path
-    from typing import Any, Literal, TextIO, Union
+    from typing import Any, Literal, TextIO
+
+    from monty.shutil import PathLike
 
 
 def loadfn(
-    fn: Union[str, Path],
+    fn: PathLike,
     *args,
     fmt: Literal["json", "yaml", "mpk"] | None = None,
     **kwargs,
@@ -87,7 +88,7 @@ def loadfn(
 
 def dumpfn(
     obj: object,
-    fn: Union[str, Path],
+    fn: PathLike,
     *args,
     fmt: Literal["json", "yaml", "mpk"] | None = None,
     **kwargs,
