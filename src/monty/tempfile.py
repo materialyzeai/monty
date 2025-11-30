@@ -50,6 +50,7 @@ class ScratchDir:
         copy_from_current_on_enter: bool = False,
         copy_to_current_on_exit: bool = False,
         gzip_on_exit: bool = False,
+        delete_removed_files: bool | None = None,
     ) -> None:
         """
         Initializes scratch directory given a **root** path. There is no need
@@ -81,7 +82,17 @@ class ScratchDir:
             gzip_on_exit (bool): Whether to gzip the files generated in the
                 ScratchDir before copying them back.
                 Defaults to False.
+            delete_removed_files (DEPRECATED): It now has no effect
+                and will be removed in 2027-01-01.
         """
+        if delete_removed_files is not None:
+            warnings.warn(
+                "The 'delete_removed_files' argument is deprecated and has no effect. "
+                "It will be removed in 2027-01-01.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+
         self.cwd: str = os.getcwd()
         self.rootpath: str | None = (
             None if rootpath is None else os.path.abspath(rootpath)

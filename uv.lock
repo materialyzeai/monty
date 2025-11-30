@@ -1,6 +1,6 @@
 version = 1
 revision = 3
-requires-python = ">=3.9, <3.14"
+requires-python = ">=3.9"
 resolution-markers = [
     "python_full_version >= '3.12'",
     "python_full_version == '3.11.*'",
@@ -601,10 +601,10 @@ dev = [
 json = [
     { name = "orjson" },
     { name = "pandas" },
-    { name = "pint", marker = "python_full_version < '3.13'" },
+    { name = "pint" },
     { name = "pydantic" },
     { name = "pymongo" },
-    { name = "torch", marker = "python_full_version < '3.13'" },
+    { name = "torch" },
 ]
 multiprocessing = [
     { name = "tqdm" },
@@ -616,10 +616,10 @@ optional = [
     { name = "msgpack" },
     { name = "orjson" },
     { name = "pandas" },
-    { name = "pint", marker = "python_full_version < '3.13'" },
+    { name = "pint" },
     { name = "pydantic" },
     { name = "pymongo" },
-    { name = "torch", marker = "python_full_version < '3.13'" },
+    { name = "torch" },
     { name = "tqdm" },
 ]
 serialization = [
@@ -657,12 +657,12 @@ requires-dist = [
     { name = "numpy" },
     { name = "orjson", marker = "extra == 'json'", specifier = ">=3.6.1" },
     { name = "pandas", marker = "extra == 'json'" },
-    { name = "pint", marker = "python_full_version < '3.13' and extra == 'json'" },
+    { name = "pint", marker = "extra == 'json'" },
     { name = "pydantic", marker = "extra == 'json'" },
     { name = "pymongo", marker = "extra == 'json'" },
     { name = "requests", marker = "extra == 'task'" },
     { name = "ruamel-yaml" },
-    { name = "torch", marker = "python_full_version < '3.13' and extra == 'json'" },
+    { name = "torch", marker = "extra == 'json'" },
     { name = "tqdm", marker = "extra == 'multiprocessing'" },
 ]
 provides-extras = ["dev", "json", "multiprocessing", "optional", "serialization", "task"]
