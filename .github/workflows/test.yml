@@ -8,23 +8,27 @@ jobs:
       fail-fast: false
       max-parallel: 20
       matrix:
-        os: [ubuntu-latest, macos-14, windows-latest]
-        python-version: ["3.9", "3.10", "3.11", "3.12", "3.13"]
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        python-version: ["3.9", "3.10", "3.11", "3.12", "3.13", "3.14"]
 
     runs-on: ${{ matrix.os }}
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
+
       - name: Install uv
-        uses: astral-sh/setup-uv@v5
+        uses: astral-sh/setup-uv@v7
         with:
           python-version: ${{ matrix.python-version }}
           enable-cache: true
           cache-dependency-glob: "uv.lock"
+
       - name: Install dependencies
         run: uv sync --all-extras
+
       - name: pytest
         run: uv run pytest --cov=monty tests --color=yes
+
       - name: Upload coverage reports to Codecov
         uses: codecov/codecov-action@v4
         env:
