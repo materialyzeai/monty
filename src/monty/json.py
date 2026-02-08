@@ -85,8 +85,7 @@ def _check_type(obj: object, type_str: tuple[str, ...] | str) -> bool:
         assert not isinstance(a, B)
 
     Note for future developers: the type_str is not always obvious for an
-    object. For example, pandas.DataFrame is actually "pandas.core.frame.DataFrame".
-    To find out the type_str for an object, run type(obj).mro(). This will
+    object. To find out the type_str for an object, run type(obj).mro(). This will
     list all the types that an object can resolve to in order of generality
     (all objects have the "builtins.object" as the last one).
     """
@@ -623,7 +622,7 @@ class MontyEncoder(json.JSONEncoder):
         if isinstance(o, np.generic):
             return o.item()
 
-        if _check_type(o, "pandas.core.frame.DataFrame"):
+        if _check_type(o, ("pandas.core.frame.DataFrame", "pandas.DataFrame")):
             return {
                 "@module": "pandas",
                 "@class": "DataFrame",
@@ -988,6 +987,7 @@ def jsanitize(
         (
             "pandas.core.series.Series",
             "pandas.core.frame.DataFrame",
+            "pandas.DataFrame",
             "pandas.core.base.PandasObject",
         ),
     ):
