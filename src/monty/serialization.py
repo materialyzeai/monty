@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import json
 import os
-from typing import TYPE_CHECKING, TextIO, cast
+from typing import TYPE_CHECKING, Literal, TextIO, cast
 
 from ruamel.yaml import YAML
 
@@ -21,6 +21,22 @@ except ImportError:
     msgpack = None
 
 if TYPE_CHECKING:
+    from pathlib import Path
+    from typing import Any, TextIO, Union
+
+_FILE_TYPE = Literal["json", "jsonl", "yaml", "mpk"]
+
+
+def _identify_format(file_name: str | Path) -> _FILE_TYPE:
+    """Identify the format of a file with name `file_name`."""
+    basename = os.path.basename(file_name).lower()
+    if ".mpk" in basename:
+        return "mpk"
+    elif any(ext in basename for ext in (".yaml", ".yml")):
+        return "yaml"
+    elif "jsonl" in basename:
+        return "jsonl"
+    return "json"
     from typing import Any, Literal, TextIO
 
     from monty.shutil import PathLike
@@ -29,7 +45,7 @@ if TYPE_CHECKING:
 def loadfn(
     fn: PathLike,
     *args,
-    fmt: Literal["json", "yaml", "mpk"] | None = None,
+    fmt: _FILE_TYPE | None = None,
     **kwargs,
 ) -> Any:
     """
@@ -40,27 +56,21 @@ def loadfn(
     detected from the file extension (case insensitive).
     YAML is assumed if the filename contains ".yaml" or ".yml".
     Msgpack is assumed if the filename contains ".mpk".
+    JSON lines is assumed if the filename contains "jsonl".
     JSON is otherwise assumed.
 
     Args:
         fn (str/Path): filename or pathlib.Path.
         *args: Any of the args supported by json/yaml.load.
-        fmt ("json" | "yaml" | "mpk"): If specified, the fmt specified would
-            be used instead of autodetection from filename.
+        fmt ("json" | "jsonl" | "yaml" | "mpk"): If specified, the fmt
+            specified would be used instead of autodetection from filename.
         **kwargs: Any of the kwargs supported by json/yaml.load.
 
     Returns:
         object: Result of json/yaml/msgpack.load.
     """
 
-    if fmt is None:
-        basename = os.path.basename(fn).lower()
-        if ".mpk" in basename:
-            fmt = "mpk"
-        elif any(ext in basename for ext in (".yaml", ".yml")):
-            fmt = "yaml"
-        else:
-            fmt = "json"
+    fmt = fmt or _identify_format(fn)
 
     if fmt == "mpk":
         if msgpack is None:
@@ -78,9 +88,13 @@ def loadfn(
                     raise RuntimeError("Loading of YAML files requires ruamel.yaml.")
                 yaml = YAML()
                 return yaml.load(fp, *args, **kwargs)
-            if fmt == "json":
+
+            if fmt in {"json", "jsonl"}:
                 if "cls" not in kwargs:
                     kwargs["cls"] = MontyDecoder
+
+                if fmt == "jsonl":
+                    return [json.loads(jline, *args, **kwargs) for jline in fp]
                 return json.load(fp, *args, **kwargs)
 
             raise TypeError(f"Invalid format: {fmt}")
@@ -90,7 +104,7 @@ def dumpfn(
     obj: object,
     fn: PathLike,
     *args,
-    fmt: Literal["json", "yaml", "mpk"] | None = None,
+    fmt: _FILE_TYPE | None = None,
     **kwargs,
 ) -> None:
     """
@@ -101,12 +115,13 @@ def dumpfn(
     detected from the file extension (case insensitive). YAML is assumed if the
     filename contains ".yaml" or ".yml".
     Msgpack is assumed if the filename contains ".mpk".
+    JSON lines is assumed if the filename contains "jsonl".
     JSON is otherwise assumed.
 
     Args:
         obj (object): Object to dump.
         fn (str/Path): filename or pathlib.Path.
-        fmt ("json" | "yaml" | "mpk"): If specified, the fmt specified would
+        fmt ("json" | "jsonl" | "yaml" | "mpk"): If specified, the fmt specified would
             be used instead of autodetection from filename.
         *args: Any of the args supported by json/yaml.dump.
         **kwargs: Any of the kwargs supported by json/yaml.dump.
@@ -114,14 +129,7 @@ def dumpfn(
     Returns:
         (object) Result of json.load.
     """
-    if fmt is None:
-        basename = os.path.basename(fn).lower()
-        if ".mpk" in basename:
-            fmt = "mpk"
-        elif any(ext in basename for ext in (".yaml", ".yml")):
-            fmt = "yaml"
-        else:
-            fmt = "json"
+    fmt = fmt or _identify_format(fn)
 
     if fmt == "mpk":
         if msgpack is None:
@@ -141,9 +149,13 @@ def dumpfn(
                     raise RuntimeError("Loading of YAML files requires ruamel.yaml.")
                 yaml = YAML()
                 yaml.dump(obj, fp, *args, **kwargs)
-            elif fmt == "json":
+            elif fmt in {"json", "jsonl"}:
                 if "cls" not in kwargs:
                     kwargs["cls"] = MontyEncoder
-                fp.write(json.dumps(obj, *args, **kwargs))
+                if fmt == "jsonl":
+                    for jobj in obj:  # type: ignore[var-annotated,attr-defined]
+                        fp.write(json.dumps(jobj, *args, **kwargs) + "\n")
+                else:
+                    fp.write(json.dumps(obj, *args, **kwargs))
             else:
                 raise TypeError(f"Invalid format: {fmt}")
