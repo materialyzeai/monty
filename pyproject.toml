@@ -44,7 +44,6 @@ json = [
 multiprocessing = ["tqdm"]
 optional = ["monty[dev,json,multiprocessing,serialization]"]
 serialization = ["msgpack"]
-task = ["requests", "invoke"]
 
 [tool.setuptools.packages.find]
 where = ["src"]
@@ -118,4 +117,8 @@ lint = [
 maintain = [
     "sphinx>=7.4.7",
     "sphinx-rtd-theme>=3.0.2",
+    "requests",
+    "invoke",
+    "myst-parser",
+    "sphinx-markdown-builder",
 ]
