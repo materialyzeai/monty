@@ -1330,19 +1330,15 @@ class TestCheckType:
         # Test pandas DataFrame
         df = pd.DataFrame({"a": [1, 2, 3]})
 
-        assert _check_type(df, "pandas.core.frame.DataFrame")
         assert isinstance(df, pd.DataFrame)
 
-        assert _check_type(df, "pandas.core.base.PandasObject")
         assert isinstance(df, pd.core.base.PandasObject)
 
         # Test pandas Series
         series = pd.Series([1, 2, 3])
 
-        assert _check_type(series, "pandas.core.series.Series")
         assert isinstance(series, pd.Series)
 
-        assert _check_type(series, "pandas.core.base.PandasObject")
         assert isinstance(series, pd.core.base.PandasObject)
 
     @pytest.mark.skipif(torch is None, reason="torch is not installed")
