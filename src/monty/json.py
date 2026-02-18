@@ -989,6 +989,16 @@ def jsanitize(
     if isinstance(obj, np.generic):
         return obj.item()
 
+    if _check_type(
+        obj,
+        (
+            "pandas.Series",
+            "pandas.DataFrame",
+            "pandas.core.base.PandasObject",
+        ),
+    ):
+        return obj.to_dict()
+
     if isinstance(obj, dict):
         return {
             str(k): jsanitize(
