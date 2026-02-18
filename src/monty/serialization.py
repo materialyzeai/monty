@@ -37,10 +37,13 @@ def _identify_format(file_name: str | Path) -> _FILE_TYPE:
     elif "jsonl" in basename:
         return "jsonl"
     return "json"
+    from typing import Any, Literal, TextIO
+
+    from monty.shutil import PathLike
 
 
 def loadfn(
-    fn: Union[str, Path],
+    fn: PathLike,
     *args,
     fmt: _FILE_TYPE | None = None,
     **kwargs,
@@ -99,7 +102,7 @@ def loadfn(
 
 def dumpfn(
     obj: object,
-    fn: Union[str, Path],
+    fn: PathLike,
     *args,
     fmt: _FILE_TYPE | None = None,
     **kwargs,
