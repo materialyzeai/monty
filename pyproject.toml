@@ -25,7 +25,7 @@ dependencies = [
   "ruamel.yaml",
   "numpy",
 ]
-version = "2025.3.3"
+version = "2026.2.18"
 
 [project.optional-dependencies]
 # dev is for "dev" module, not for development
@@ -119,4 +119,5 @@ maintain = [
     "invoke",
     "myst-parser",
     "sphinx-markdown-builder",
+    "roman-numerals",
 ]

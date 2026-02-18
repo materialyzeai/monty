@@ -661,7 +661,7 @@ wheels = [
 
 [[package]]
 name = "monty"
-version = "2025.3.3"
+version = "2026.2.18"
 source = { editable = "." }
 dependencies = [
     { name = "numpy" },
@@ -713,6 +713,7 @@ maintain = [
     { name = "invoke" },
     { name = "myst-parser" },
     { name = "requests" },
+    { name = "roman-numerals" },
     { name = "sphinx", version = "9.0.4", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.12'" },
     { name = "sphinx", version = "9.1.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12'" },
     { name = "sphinx-markdown-builder" },
@@ -751,6 +752,7 @@ maintain = [
     { name = "invoke" },
     { name = "myst-parser" },
     { name = "requests" },
+    { name = "roman-numerals" },
     { name = "sphinx", specifier = ">=7.4.7" },
     { name = "sphinx-markdown-builder" },
     { name = "sphinx-rtd-theme", specifier = ">=3.0.2" },
