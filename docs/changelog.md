@@ -1,5 +1,17 @@
 # Change log
 
+## Unreleased
+- Drop Python 3.9 and 3.10 support.
+- Deprecate `delete_removed_files` from `ScratchDir` (#762, @DanielYang59)
+- Support JSON lines in load/dumpfn (#770, @esoteric-ephemera)
+- Remove dev-facing `task` dependency group, merge into `maintain` (#771, @DanielYang59)
+- Fix pandas DataFrame type check for pandas 3 (#773, @DanielYang59)
+- ScratchDir: warn for copy-back race when overwriting newer file (#759, @DanielYang59)
+- Remove deprecated behavior: `zopen` no longer allows default/implicit text/binary `mode`; allow `mode` as positional argument (#752, @DanielYang59)
+- Include `size` when encoding torch tensor in JSON; release `<3.13` pin for `pint` and `torch` (#755, @DanielYang59)
+- Better return type annotation for `zopen` (#757, @DanielYang59)
+- Deprecate `copy_r` in favor of `shutil.copytree(src, dst, dirs_exist_ok=True)` (#761, @DanielYang59)
+
 ## 2025.3.3
 - Move Partial Serialization out of MSONable (@jmmshn)
 
