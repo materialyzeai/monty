@@ -19,6 +19,9 @@ from monty.json import (
     _load_redirect,
     jsanitize,
     load,
+    load2dict,
+    partial_monty_encode,
+    save,
 )
 
 from . import __version__ as TESTS_VERSION
@@ -52,6 +55,10 @@ try:
     from bson.dbref import DBRef
 except ImportError:
     DBRef = None
+    from bson import json_util
+except ImportError:
+    json_util = None
+
 
 TEST_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "test_files")
 
@@ -500,19 +507,91 @@ class TestJson:
         assert listobj2[0].a.a == 1
 
     @pytest.mark.skipif(torch is None, reason="torch not present")
-    def test_torch(self):
-        t = torch.tensor([0, 1, 2])
-        jsonstr = json.dumps(t, cls=MontyEncoder)
-        t2 = json.loads(jsonstr, cls=MontyDecoder)
-        assert isinstance(t2, torch.Tensor)
-        assert t2.type() == t.type()
-        assert np.array_equal(t2, t)
-        t = torch.tensor([1 + 1j, 2 + 1j])
-        jsonstr = json.dumps(t, cls=MontyEncoder)
-        t2 = json.loads(jsonstr, cls=MontyDecoder)
-        assert isinstance(t2, torch.Tensor)
-        assert t2.type() == t.type()
-        assert np.array_equal(t2, t)
+    def test_torch_tensor(self):
+        # Basic tensor
+        t0 = torch.tensor([0, 1, 2])
+        t0_json_str = json.dumps(t0, cls=MontyEncoder)
+        t0_json_dict = json.loads(t0_json_str)
+        t0_from_json = json.loads(t0_json_str, cls=MontyDecoder)
+
+        assert isinstance(t0_from_json, torch.Tensor)
+        assert t0_from_json.type() == t0.type()
+        assert t0_json_dict["size"] == list(t0.size())
+        assert np.array_equal(t0_from_json, t0)
+
+        # Empty tensor
+        t_empty = torch.empty((0, 2))
+        t_empty_json_str = json.dumps(t_empty, cls=MontyEncoder)
+        t_empty_json_dict = json.loads(t_empty_json_str)
+        t_empty_from_json = json.loads(t_empty_json_str, cls=MontyDecoder)
+
+        assert isinstance(t_empty_from_json, torch.Tensor)
+        assert t_empty_from_json.size() == t_empty.size()
+        assert t_empty_json_dict["size"] == list(t_empty.size())
+        assert np.array_equal(t_empty_from_json.numpy(), t_empty.numpy())
+
+        # Complex tensor
+        ct0 = torch.tensor([1 + 1j, 2 + 1j])
+        ct0_json_str = json.dumps(ct0, cls=MontyEncoder)
+        ct0_json_dict = json.loads(ct0_json_str)
+        ct0_from_json = json.loads(ct0_json_str, cls=MontyDecoder)
+
+        assert isinstance(ct0_from_json, torch.Tensor)
+        assert ct0_from_json.type() == ct0.type()
+        assert ct0_json_dict["size"] == list(ct0.size())
+        assert np.allclose(ct0_from_json.numpy(), ct0.numpy())
+
+        # Empty complex tensor
+        ct_empty = torch.empty((0, 2), dtype=torch.complex64)
+        ct_empty_json_str = json.dumps(ct_empty, cls=MontyEncoder)
+        ct_empty_json_dict = json.loads(ct_empty_json_str)
+        ct_empty_from_json = json.loads(ct_empty_json_str, cls=MontyDecoder)
+
+        assert isinstance(ct_empty_from_json, torch.Tensor)
+        assert ct_empty_from_json.size() == ct_empty.size()
+        assert ct_empty_json_dict["size"] == list(ct_empty.size())
+        assert np.array_equal(ct_empty_from_json.numpy(), ct_empty.numpy())
+
+    @pytest.mark.skipif(torch is None, reason="torch not present")
+    def test_torch_tensor_backwards_compatibility(self):
+        # Simulate an old-style JSON (no "size")
+        old_json = json.dumps(
+            {
+                "@module": "torch",
+                "@class": "Tensor",
+                "dtype": "torch.LongTensor",
+                "data": [0, 1, 2],
+            }
+        )
+
+        t = json.loads(old_json, cls=MontyDecoder)
+
+        assert isinstance(t, torch.Tensor)
+        assert t.dtype == torch.long
+        assert t.size() == torch.Size([3])
+        assert torch.equal(t, torch.tensor([0, 1, 2]))
+
+        # Test old decoder is compatible with new JSON (with `size`)
+        def old_decoder_simulation(json_obj):
+            if (
+                json_obj.get("@module") == "torch"
+                and json_obj.get("@class") == "Tensor"
+            ):
+                dtype = json_obj["dtype"]
+                data = json_obj["data"]
+                return torch.tensor(data).type(dtype)
+            else:
+                raise RuntimeError("")
+
+        # New-style JSON with `size`
+        t = torch.empty((0, 2), dtype=torch.float32)
+        new_json = json.dumps(t, cls=MontyEncoder)
+        json_obj = json.loads(new_json)
+
+        decoded = old_decoder_simulation(json_obj)
+
+        assert isinstance(decoded, torch.Tensor)
+        assert list(decoded.size()) == [0] != list(t.size())
 
     def test_datetime(self):
         dt = datetime.datetime.now()
@@ -988,7 +1067,7 @@ class TestJson:
             json.loads(json.dumps(d2), cls=MontyDecoder)
 
     def test_redirect_settings_file(self):
-        data = _load_redirect(os.path.join(TEST_DIR, "test_settings.yaml"))
+        data = _load_redirect(os.path.join(TEST_DIR, "settings_for_test.yaml"))
         assert data == {
             "old_module": {
                 "old_class": {"@class": "new_class", "@module": "new_module"}
@@ -1145,6 +1224,41 @@ class TestJson:
         na2 = EnumAsDict.from_dict(d_)
         assert na2 == na1
 
+    def test_partial_serializable(self, tmp_path):
+        is_m = GoodMSONClass(a=1, b=2, c=3)
+        not_m = GoodNOTMSONClass(a="a", b="b", c="c")
+
+        is_m_jsons, is_m_map = partial_monty_encode(is_m)
+        is_m_d = json.loads(is_m_jsons)
+        assert is_m_d["@class"] == "GoodMSONClass"
+        assert is_m_d["a"] == 1
+        assert len(is_m_map) == 0
+
+        not_m_jsons, not_m_map = partial_monty_encode(not_m)
+        not_m_d = json.loads(not_m_jsons)
+        assert not_m_d["@class"] == "GoodNOTMSONClass"
+        assert "@object_reference" in not_m_d
+        assert len(not_m_map) == 1
+        mixed = {"is_m": is_m, "not_m": not_m}
+        mixed_jsons, mixed_map = partial_monty_encode(mixed, {"indent": 2})
+        mixed_d = json.loads(mixed_jsons)
+        assert mixed_d["is_m"]["a"] == 1
+        assert mixed_d["is_m"]["@class"] == "GoodMSONClass"
+        assert "@object_reference" in mixed_d["not_m"]
+        assert mixed_d["not_m"]["@class"] == "GoodNOTMSONClass"
+
+        mixed = {"is_m": is_m, "not_m": not_m}
+        save(mixed, tmp_path / "mixed.json")
+        loaded = load2dict(tmp_path / "mixed.json")
+        assert loaded["is_m"]["a"] == 1
+        assert loaded["not_m"].a == "a"
+
+        # Test when you are allowed to overwrite
+        with pytest.raises(FileExistsError):
+            save(mixed, tmp_path / "mixed.json")
+
+        save(mixed, tmp_path / "mixed.json", strict=False)
+
 
 class TestCheckType:
     def test_check_subclass(self):
@@ -1233,7 +1347,7 @@ class TestCheckType:
         # Test pandas DataFrame
         df = pd.DataFrame({"a": [1, 2, 3]})
 
-        assert _check_type(df, "pandas.core.frame.DataFrame")
+        assert _check_type(df, "pandas.DataFrame")
         assert isinstance(df, pd.DataFrame)
 
         assert _check_type(df, "pandas.core.base.PandasObject")
@@ -1242,7 +1356,7 @@ class TestCheckType:
         # Test pandas Series
         series = pd.Series([1, 2, 3])
 
-        assert _check_type(series, "pandas.core.series.Series")
+        assert _check_type(series, "pandas.Series")
         assert isinstance(series, pd.Series)
 
         assert _check_type(series, "pandas.core.base.PandasObject")
@@ -1274,9 +1388,8 @@ class TestCheckType:
         assert isinstance(qty, pint.Quantity)
 
     @pytest.mark.skipif(ObjectId is None, reason="bson not present")
+    @pytest.mark.skipif(json_util is None, reason="pymongo not present")
     def test_extended_json(self):
-        from bson import json_util
-
         ext_json_dict = {
             "datetime": datetime.datetime.now(datetime.timezone.utc),
             "NaN": float("NaN"),

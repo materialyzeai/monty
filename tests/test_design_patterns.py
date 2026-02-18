@@ -3,11 +3,14 @@ from __future__ import annotations
 import gc
 import pickle
 import weakref
-from typing import Any
+from typing import TYPE_CHECKING
 
 import pytest
 
 from monty.design_patterns import cached_class, singleton
+
+if TYPE_CHECKING:
+    from typing import Any
 
 
 class TestSingleton:

@@ -5,7 +5,6 @@ Path based methods, e.g., which, zpath, etc.
 from __future__ import annotations
 
 import os
-from pathlib import Path
 from typing import TYPE_CHECKING
 
 from monty.fnmatch import WildCard
@@ -14,8 +13,10 @@ from monty.string import list_strings
 if TYPE_CHECKING:
     from typing import Callable, Literal, Optional, Union
 
+    from monty.shutil import PathLike
 
-def zpath(filename: str | Path) -> str:
+
+def zpath(filename: PathLike) -> str:
     """
     Returns an existing (zipped or unzipped) file path given the unzipped
     version. If no path exists, returns the filename unmodified.

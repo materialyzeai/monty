@@ -2,9 +2,17 @@ from __future__ import annotations
 
 from math import sqrt
 
-from monty.multiprocessing import imap_tqdm
+import pytest
+
+try:
+    from tqdm.autonotebook import tqdm
+
+    from monty.multiprocessing import imap_tqdm
+except ImportError:
+    tqdm = None
 
 
+@pytest.mark.skipif(tqdm is None, reason="tqdm not installed")
 def test_imap_tqdm():
     results = imap_tqdm(4, sqrt, range(10_000))
     assert len(results) == 10_000

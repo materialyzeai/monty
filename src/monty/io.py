@@ -16,21 +16,41 @@ import subprocess
 import time
 import warnings
 from pathlib import Path
-from typing import TYPE_CHECKING, Literal, cast
+from typing import IO, TYPE_CHECKING, Any, Literal, cast, overload
 
 if TYPE_CHECKING:
-    from typing import IO, Any, Iterator, Union
+    from typing import Iterator, TypeAlias
+
+    from monty.shutil import PathLike
 
 
 class EncodingWarning(Warning): ...  # Added in Python 3.10
 
 
+# fmt: off
+TextModes: TypeAlias = Literal[
+    "r", "w", "a", "r+", "w+", "a+",
+    "rt", "tr", "wt", "tw", "at", "ta",
+    "rt+", "tr+", "wt+", "tw+", "at+", "ta+",
+]
+BinModes: TypeAlias = Literal[
+    "rb", "br", "wb", "bw", "ab", "ba",
+    "rb+", "br+", "wb+", "bw+", "ab+", "ba+",
+]
+# fmt: on
+
+
+@overload
+def zopen(filename: PathLike, mode: TextModes, **kwargs: Any) -> IO[str]: ...
+@overload
+def zopen(filename: PathLike, mode: BinModes, **kwargs: Any) -> IO[bytes]: ...
+@overload  # fallback
+def zopen(filename: PathLike, mode: str, **kwargs: Any) -> IO[Any]: ...
 def zopen(
-    filename: Union[str, Path],
-    /,
-    mode: str | None = None,
+    filename: PathLike,
+    mode: str,
     **kwargs: Any,
-) -> IO | bz2.BZ2File | gzip.GzipFile | lzma.LZMAFile:
+) -> IO[Any]:
     """
     This function wraps around `[bz2/gzip/lzma].open` and `open`
     to deal intelligently with compressed or uncompressed files.
@@ -38,16 +58,13 @@ def zopen(
         `with zopen(filename, mode="rt", ...)`
 
     Important Notes:
-        - Default `mode` should not be used, and would not be allow
-            in future versions.
         - Always explicitly specify binary/text in `mode`, i.e.
-            always pass `t` or `b` in `mode`, implicit binary/text
-            mode would not be allow in future versions.
+            always pass `t` or `b` in `mode`.
         - Always provide an explicit `encoding` in text mode, it would
             be set to UTF-8 by default otherwise.
 
     Args:
-        filename (str | Path): The file to open.
+        filename (PathLike): The file to open.
         mode (str): The mode in which the file is opened, you should
             explicitly specify "b" for binary or "t" for text.
         **kwargs: Additional keyword arguments to pass to `open`.
@@ -55,29 +72,10 @@ def zopen(
     Returns:
         TextIO | BinaryIO | bz2.BZ2File | gzip.GzipFile | lzma.LZMAFile
     """
-    # Deadline for dropping implicit `mode` support
-    _deadline: str = "2025-06-01"
-
-    # Warn against default `mode`
-    # TODO: remove default value of `mode` to force user to give one after deadline
-    if mode is None:
-        warnings.warn(
-            "We strongly discourage using a default `mode`, it would be "
-            f"set to `r` now but would not be allowed after {_deadline}",
-            FutureWarning,
-            stacklevel=2,
-        )
-        mode = "r"
-
-    # Warn against implicit text/binary `mode`
-    # TODO: replace warning with exception after deadline
-    elif not ("b" in mode or "t" in mode):
-        warnings.warn(
-            "We strongly discourage using implicit binary/text `mode`, "
-            f"and this would not be allowed after {_deadline}. "
-            "I.e. you should pass t/b in `mode`.",
-            FutureWarning,
-            stacklevel=2,
+    # Don't allow implicit text/binary `mode`
+    if not ("b" in mode or "t" in mode):
+        raise RuntimeError(
+            "Implicit text/binary mode is not allowed, please pass t/b explicitly in mode."
         )
 
     # Warn against default `encoding` in text mode if
@@ -97,9 +95,9 @@ def zopen(
     ext = ext.lower()
 
     if ext == ".bz2":
-        return bz2.open(filename, mode, **kwargs)
+        return cast(IO[Any], bz2.open(filename, mode, **kwargs))
     if ext == ".gz":
-        return gzip.open(filename, mode, **kwargs)
+        return cast(IO[Any], gzip.open(filename, mode, **kwargs))
     if ext == ".z":
         # TODO: drop ".z" extension support after 2026-01-01
         warnings.warn(
@@ -109,11 +107,11 @@ def zopen(
             category=FutureWarning,
             stacklevel=2,
         )
-        return gzip.open(filename, mode, **kwargs)
+        return cast(IO[Any], gzip.open(filename, mode, **kwargs))
     if ext in {".xz", ".lzma"}:
-        return lzma.open(filename, mode, **kwargs)
+        return cast(IO[Any], lzma.open(filename, mode, **kwargs))
 
-    return open(filename, mode, **kwargs)
+    return cast(IO[Any], open(filename, mode, **kwargs))
 
 
 def _get_line_ending(
@@ -172,7 +170,7 @@ def _get_line_ending(
 
 
 def reverse_readfile(
-    filename: Union[str, Path],
+    filename: PathLike,
 ) -> Iterator[str]:
     """
     A much faster reverse read of file by using Python's mmap to generate a
@@ -181,7 +179,7 @@ def reverse_readfile(
     of such a function).
 
     Args:
-        filename (str | Path): File to read.
+        filename (PathLike): File to read.
 
     Yields:
         Lines from the file in reverse order.

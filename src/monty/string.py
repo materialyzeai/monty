@@ -4,10 +4,10 @@ Useful additional string functions.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Iterable, cast
+from typing import TYPE_CHECKING, cast
 
 if TYPE_CHECKING:
-    from typing import Any, Union
+    from typing import Any, Iterable, Union
 
 
 def remove_non_ascii(s: str) -> str:

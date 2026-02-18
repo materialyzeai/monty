@@ -7,42 +7,39 @@ import shutil
 import warnings
 from gzip import GzipFile
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Union
 
 from monty.io import zopen
 
 if TYPE_CHECKING:
-    from typing import Literal, Optional
+    from typing import Literal, Optional, TypeAlias
+
+PathLike: TypeAlias = Union[str, Path]
 
 
-def copy_r(src: str | Path, dst: str | Path) -> None:
+def copy_r(src: PathLike, dst: PathLike) -> None:
     """
+    Deprecated: please use `shutil.copytree(src, dst, dirs_exist_ok=True)`,
+    use the `symlinks` arg to control whether you want to dereference symlinks.
+
     Implements a recursive copy function similar to Unix's "cp -r" command.
     Surprisingly, python does not have a real equivalent. shutil.copytree
     only works if the destination directory is not present.
 
     Args:
-        src (str | Path): Source folder to copy.
-        dst (str | Path): Destination folder.
+        src (PathLike): Source folder to copy.
+        dst (PathLike): Destination folder.
     """
-    src = Path(src)
-    dst = Path(dst)
-    abssrc = src.resolve()
-    absdst = dst.resolve()
-    os.makedirs(absdst, exist_ok=True)
-    for filepath in os.listdir(abssrc):
-        fpath = Path(abssrc, filepath)
-        if fpath.is_symlink():
-            continue
-        if fpath.is_file():
-            shutil.copy(fpath, absdst)
-        elif str(fpath) not in str(absdst):
-            copy_r(fpath, Path(absdst, filepath))
-        else:
-            warnings.warn(f"Cannot copy {fpath} to itself")
+    # TODO: remove after 2027-01-01
+    warnings.warn(
+        "please use `shutil.copytree(src, dst, dirs_exist_ok=True)`",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+    shutil.copytree(src, dst, dirs_exist_ok=True)
 
 
-def gzip_dir(path: str | Path, compresslevel: int = 6) -> None:
+def gzip_dir(path: PathLike, compresslevel: int = 6) -> None:
     """
     Gzips all files in a directory. Note that this is different from
     shutil.make_archive, which creates a tar archive. The aim of this method
@@ -50,7 +47,7 @@ def gzip_dir(path: str | Path, compresslevel: int = 6) -> None:
     commands like zless or zcat.
 
     Args:
-        path (str | Path): Path to directory.
+        path (PathLike): Path to directory.
         compresslevel (int): Level of compression, 1-9. 9 is default for
             GzipFile, 6 is default for gzip.
     """
@@ -74,9 +71,9 @@ def gzip_dir(path: str | Path, compresslevel: int = 6) -> None:
 
 
 def compress_file(
-    filepath: str | Path,
+    filepath: PathLike,
     compression: Literal["gz", "bz2"] = "gz",
-    target_dir: Optional[str | Path] = None,
+    target_dir: Optional[PathLike] = None,
 ) -> None:
     """
     Compresses a file with the correct extension. Functions like standard
@@ -84,10 +81,10 @@ def compress_file(
     uncompressed files are not retained.
 
     Args:
-        filepath (str | Path): Path to file.
+        filepath (PathLike): Path to file.
         compression (str): A compression mode. Valid options are "gz" or
             "bz2". Defaults to "gz".
-        target_dir (str | Path): An optional target dir where the result compressed
+        target_dir (PathLike): An optional target dir where the result compressed
             file would be stored. Defaults to None for in-place compression.
     """
     filepath = Path(filepath)
@@ -99,7 +96,7 @@ def compress_file(
     if filepath.suffix.lower() != f".{compression}" and not filepath.is_symlink():
         if target_dir is not None:
             os.makedirs(target_dir, exist_ok=True)
-            compressed_file: str | Path = target_dir / f"{filepath.name}.{compression}"
+            compressed_file: PathLike = target_dir / f"{filepath.name}.{compression}"
 
         else:
             compressed_file = f"{str(filepath)}.{compression}"
@@ -110,14 +107,14 @@ def compress_file(
         os.remove(filepath)
 
 
-def compress_dir(path: str | Path, compression: Literal["gz", "bz2"] = "gz") -> None:
+def compress_dir(path: PathLike, compression: Literal["gz", "bz2"] = "gz") -> None:
     """
     Recursively compresses all files in a directory. Note that this
     compresses all files singly, i.e., it does not create a tar archive. For
     that, just use Python tarfile class.
 
     Args:
-        path (str | Path): Path to parent directory.
+        path (PathLike): Path to parent directory.
         compression (str): A compression mode. Valid options are "gz" or
             "bz2". Defaults to gz.
     """
@@ -130,15 +127,15 @@ def compress_dir(path: str | Path, compression: Literal["gz", "bz2"] = "gz") -> 
 
 
 def decompress_file(
-    filepath: str | Path, target_dir: Optional[str | Path] = None
+    filepath: PathLike, target_dir: Optional[PathLike] = None
 ) -> str | None:
     """
     Decompresses a file with the correct extension. Automatically detects
     gz, bz2 or z extension.
 
     Args:
-        filepath (str | Path): Path to file.
-        target_dir (str | Path): An optional target dir where the result decompressed
+        filepath (PathLike): Path to file.
+        target_dir (PathLike): An optional target dir where the result decompressed
             file would be stored. Defaults to None for in-place decompression.
 
     Returns:
@@ -151,7 +148,7 @@ def decompress_file(
     if file_ext.lower() in {".bz2", ".gz", ".z"} and filepath.is_file():
         if target_dir is not None:
             os.makedirs(target_dir, exist_ok=True)
-            decompressed_file: str | Path = target_dir / filepath.name.removesuffix(
+            decompressed_file: PathLike = target_dir / filepath.name.removesuffix(
                 file_ext
             )
         else:
@@ -166,12 +163,12 @@ def decompress_file(
     return None
 
 
-def decompress_dir(path: str | Path) -> None:
+def decompress_dir(path: PathLike) -> None:
     """
     Recursively decompresses all files in a directory.
 
     Args:
-        path (str | Path): Path to parent directory.
+        path (PathLike): Path to parent directory.
     """
     path = Path(path)
     for parent, _, files in os.walk(path):
@@ -179,7 +176,7 @@ def decompress_dir(path: str | Path) -> None:
             decompress_file(Path(parent, f))
 
 
-def remove(path: str | Path, follow_symlink: bool = False) -> None:
+def remove(path: PathLike, follow_symlink: bool = False) -> None:
     """
     Implements a remove function that will delete files, folder trees and
     symlink trees.
@@ -189,7 +186,7 @@ def remove(path: str | Path, follow_symlink: bool = False) -> None:
     3.) Remove directory with rmtree
 
     Args:
-        path (str | Path): path to remove
+        path (PathLike): path to remove
         follow_symlink(bool): follow symlinks and removes whatever is in them
     """
     path = Path(path)

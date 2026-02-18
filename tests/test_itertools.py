@@ -1,5 +1,3 @@
-# Copyright (c) Materials Virtual Lab.
-# Distributed under the terms of the BSD License.
 from __future__ import annotations
 
 from monty.itertools import chunks, iterator_from_slice

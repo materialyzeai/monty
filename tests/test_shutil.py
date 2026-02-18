@@ -4,7 +4,6 @@ import os
 import platform
 import shutil
 import tempfile
-import unittest
 from gzip import GzipFile
 from pathlib import Path
 
@@ -42,7 +41,8 @@ class TestCopyR:
             )
 
     def test_recursive_copy_and_compress(self):
-        copy_r(os.path.join(TEST_DIR, "cpr_src"), os.path.join(TEST_DIR, "cpr_dst"))
+        with pytest.warns(DeprecationWarning, match="shutil.copytree"):
+            copy_r(os.path.join(TEST_DIR, "cpr_src"), os.path.join(TEST_DIR, "cpr_dst"))
         assert os.path.exists(os.path.join(TEST_DIR, "cpr_dst", "test"))
         assert os.path.exists(os.path.join(TEST_DIR, "cpr_dst", "sub", "testr"))
 
@@ -59,7 +59,8 @@ class TestCopyR:
 
     def test_pathlib(self):
         test_path = Path(TEST_DIR)
-        copy_r(test_path / "cpr_src", test_path / "cpr_dst")
+        with pytest.warns(DeprecationWarning, match="shutil.copytree"):
+            copy_r(test_path / "cpr_src", test_path / "cpr_dst")
         assert (test_path / "cpr_dst" / "test").exists()
         assert (test_path / "cpr_dst" / "sub" / "testr").exists()
 
@@ -189,7 +190,7 @@ class TestGzipDir:
 
 
 class TestRemove:
-    @unittest.skipIf(platform.system() == "Windows", "Skip on windows")
+    @pytest.mark.skipif(platform.system() == "Windows", reason="Skip on windows")
     def test_remove_file(self):
         tempdir = tempfile.mkdtemp(dir=TEST_DIR)
         tempf = tempfile.mkstemp(dir=tempdir)[1]
@@ -197,13 +198,13 @@ class TestRemove:
         assert not os.path.isfile(tempf)
         shutil.rmtree(tempdir)
 
-    @unittest.skipIf(platform.system() == "Windows", "Skip on windows")
+    @pytest.mark.skipif(platform.system() == "Windows", reason="Skip on windows")
     def test_remove_folder(self):
         tempdir = tempfile.mkdtemp(dir=TEST_DIR)
         remove(tempdir)
         assert not os.path.isdir(tempdir)
 
-    @unittest.skipIf(platform.system() == "Windows", "Skip on windows")
+    @pytest.mark.skipif(platform.system() == "Windows", reason="Skip on windows")
     def test_remove_symlink(self):
         tempdir = tempfile.mkdtemp(dir=TEST_DIR)
         tempf = tempfile.mkstemp(dir=tempdir)[1]
@@ -216,7 +217,7 @@ class TestRemove:
         assert not os.path.islink(templink)
         remove(tempdir)
 
-    @unittest.skipIf(platform.system() == "Windows", "Skip on windows")
+    @pytest.mark.skipif(platform.system() == "Windows", reason="Skip on windows")
     def test_remove_symlink_follow(self):
         tempdir = tempfile.mkdtemp(dir=TEST_DIR)
         tempf = tempfile.mkstemp(dir=tempdir)[1]

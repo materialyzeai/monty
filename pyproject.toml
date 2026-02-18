@@ -5,13 +5,17 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "monty"
 maintainers = [
-    { name = "Shyue Ping Ong", email = "ongsp@ucsd.edu" },
+    { name = "Shyue Ping Ong", email = "shyuep@gmail.com" },
 ]
 description = "Monty is the missing complement to Python."
 readme = "README.md"
-requires-python = ">=3.9,<3.14"
+requires-python = ">=3.11"
 classifiers = [
     "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
     "License :: OSI Approved :: MIT License",
@@ -22,37 +26,23 @@ dependencies = [
   "ruamel.yaml",
   "numpy",
 ]
-version = "2025.1.9"
+version = "2026.2.18"
 
 [project.optional-dependencies]
-ci = [
-  "coverage",
-  "monty[optional]",
-  "pytest>=8",
-  "pytest-cov>=4",
-  "types-requests",
-  "pymongo"
-]
 # dev is for "dev" module, not for development
 dev = ["ipython"]
-docs = [
-    "sphinx",
-    "sphinx_rtd_theme",
-]
 json = [
   "pymongo",
   "orjson>=3.6.1",
   "pandas",
   "pydantic",
-  # https://github.com/hgrecco/pint/issues/2065
-  "pint; python_version<'3.13'",
+  "pint",
   # Note: need torch>=2.3.0 for numpy 2 # 719
-  "torch; python_version<'3.13'",  # python 3.13 not supported yet
+  "torch",
 ]
 multiprocessing = ["tqdm"]
 optional = ["monty[dev,json,multiprocessing,serialization]"]
 serialization = ["msgpack"]
-task = ["requests", "invoke"]
 
 [tool.setuptools.packages.find]
 where = ["src"]
@@ -60,7 +50,7 @@ include = ["monty", "monty.*"]
 
 [tool.black]
 line-length = 120
-target-version = ["py39"]
+target-version = ["py311"]
 include = '\.pyi?$'
 exclude = '''
 (
@@ -108,3 +98,27 @@ select = [
 [tool.ruff.lint.isort]
 required-imports = ["from __future__ import annotations"]
 known-first-party = ["monty"]
+
+[tool.uv]
+default-groups = "all"
+
+[dependency-groups]
+dev = [
+    "coverage>=7.7.1",
+    "pre-commit>=4.2.0",
+    "pytest>=8.3.5",
+    "pytest-cov>=6.0.0",
+]
+lint = [
+    "mypy>=1.15.0",
+    "ruff>=0.11.2",
+]
+maintain = [
+    "sphinx>=7.4.7",
+    "sphinx-rtd-theme>=3.0.2",
+    "requests",
+    "invoke",
+    "myst-parser",
+    "sphinx-markdown-builder",
+    "roman-numerals",
+]

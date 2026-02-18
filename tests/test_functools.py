@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import platform
 import time
-import unittest
 
 import pytest
 
@@ -620,7 +619,7 @@ class TestTryOrReturn:
 
 
 class TestTimeout:
-    @unittest.skipIf(platform.system() == "Windows", "Skip on windows")
+    @pytest.mark.skipif(platform.system() == "Windows", reason="Skip on windows")
     def test_with(self):
         try:
             with timeout(1, "timeout!"):

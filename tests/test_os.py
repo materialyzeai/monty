@@ -1,12 +1,15 @@
 from __future__ import annotations
 
 import os
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pytest
 
 from monty.os import cd, makedirs_p
 from monty.os.path import find_exts, zpath
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 MODULE_DIR = os.path.dirname(__file__)
 TEST_DIR = os.path.join(MODULE_DIR, "test_files")

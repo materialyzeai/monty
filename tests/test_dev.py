@@ -3,11 +3,15 @@ from __future__ import annotations
 import unittest
 import warnings
 from dataclasses import dataclass
-from unittest.mock import patch
 
 import pytest
 
 from monty.dev import deprecated, install_excepthook, requires
+
+try:
+    from IPython.core import ultratb
+except ImportError:
+    ultratb = None
 
 # Set all warnings to always be triggered.
 warnings.simplefilter("always")
@@ -200,5 +204,6 @@ def test_requires():
         use_import_error()
 
 
+@pytest.mark.skipif(ultratb is None, reason="ipython is not installed")
 def test_install_except_hook():
     install_excepthook()

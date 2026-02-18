@@ -34,12 +34,6 @@ except ImportError:
     bson = None
     json_util = None
 
-try:
-    import orjson
-except ImportError:
-    orjson = None  # type: ignore[assignment]
-
-
 __version__ = "3.0.0"
 
 
@@ -91,8 +85,7 @@ def _check_type(obj: object, type_str: tuple[str, ...] | str) -> bool:
         assert not isinstance(a, B)
 
     Note for future developers: the type_str is not always obvious for an
-    object. For example, pandas.DataFrame is actually "pandas.core.frame.DataFrame".
-    To find out the type_str for an object, run type(obj).mro(). This will
+    object. To find out the type_str for an object, run type(obj).mro(). This will
     list all the types that an object can resolve to in order of generality
     (all objects have the "builtins.object" as the last one).
     """
@@ -355,42 +348,6 @@ class MSONable:
         custom_schema = cls._generic_json_schema()
         field_schema.update(custom_schema)
 
-    def _get_partial_json(self, json_kwargs, pickle_kwargs):
-        """Used with the save method. Gets the json representation of a class
-        with the unserializable components sustituted for hash references."""
-
-        if pickle_kwargs is None:
-            pickle_kwargs = {}
-        if json_kwargs is None:
-            json_kwargs = {}
-        encoder = MontyEncoder(allow_unserializable_objects=True, **json_kwargs)
-        encoded = encoder.encode(self)
-        return encoder, encoded, json_kwargs, pickle_kwargs
-
-    def get_partial_json(self, json_kwargs=None, pickle_kwargs=None):
-        """
-        Parameters
-        ----------
-        json_kwargs : dict
-            Keyword arguments to pass to the serializer.
-        pickle_kwargs : dict
-            Keyword arguments to pass to pickle.dump.
-
-        Returns
-        -------
-        str, dict
-            The json encoding of the class and the name-object map if one is
-            required, otherwise None.
-        """
-
-        encoder, encoded, json_kwargs, pickle_kwargs = self._get_partial_json(
-            json_kwargs, pickle_kwargs
-        )
-        name_object_map = encoder._name_object_map
-        if len(name_object_map) == 0:
-            name_object_map = None
-        return encoded, name_object_map, json_kwargs, pickle_kwargs
-
     def save(
         self,
         json_path,
@@ -428,34 +385,14 @@ class MSONable:
         strict : bool
             If True, will not allow you to overwrite existing files.
         """
-
-        json_path = Path(json_path)
-        save_dir = json_path.parent
-
-        encoded, name_object_map, json_kwargs, pickle_kwargs = self.get_partial_json(
-            json_kwargs, pickle_kwargs
+        save(
+            self,
+            json_path,
+            mkdir=mkdir,
+            json_kwargs=json_kwargs,
+            pickle_kwargs=pickle_kwargs,
+            strict=strict,
         )
-
-        if mkdir:
-            save_dir.mkdir(exist_ok=True, parents=True)
-
-        # Define the pickle path
-        pickle_path = save_dir / f"{json_path.stem}.pkl"
-
-        # Check if the files exist and the strict parameter is True
-        if strict and json_path.exists():
-            raise FileExistsError(f"strict is true and file {json_path} exists")
-        if strict and pickle_path.exists():
-            raise FileExistsError(f"strict is true and file {pickle_path} exists")
-
-        # Save the json file
-        with open(json_path, "w", encoding="utf-8") as outfile:
-            outfile.write(encoded)
-
-        # Save the pickle file if we have anything to save from the name_object_map
-        if name_object_map is not None:
-            with open(pickle_path, "wb") as f:
-                pickle.dump(name_object_map, f, **pickle_kwargs)
 
     @classmethod
     def load(cls, file_path):
@@ -472,8 +409,77 @@ class MSONable:
             An instance of the class being reloaded.
         """
 
-        d = _d_from_path(file_path)
+        d = load2dict(file_path)
         return cls.from_dict(d)
+
+
+def save(
+    obj,
+    json_path,
+    mkdir=True,
+    json_kwargs=None,
+    pickle_kwargs=None,
+    strict=True,
+):
+    """Utility that uses the standard tools of MSONable to convert the
+    class to json format, but also save it to disk. In addition, this
+    method intelligently uses pickle to individually pickle class objects
+    that are not serializable, saving them separately. This maximizes the
+    readability of the saved class information while allowing _any_
+    class to be at least partially serializable to disk.
+
+    For a fully MSONable class, only a class.json file will be saved to
+    the location {save_dir}/class.json. For a partially MSONable class,
+    additional information will be saved to the save directory at
+    {save_dir}. This includes a pickled object for each attribute that
+    e serialized.
+
+    Args:
+    obj : Object
+        The object to save.
+    file_path : os.PathLike
+        The file to which to save the json object. A pickled object of
+        the same name but different extension might also be saved if the
+        class is not entirely MSONable.
+    mkdir : bool
+        If True, makes the provided directory, including all parent
+        directories.
+    json_kwargs : dict
+        Keyword arguments to pass to the serializer.
+    pickle_kwargs : dict
+        Keyword arguments to pass to pickle.dump.
+    strict : bool
+        If True, will not allow you to overwrite existing files.
+    """
+
+    json_path = Path(json_path)
+    save_dir = json_path.parent
+
+    json_kwargs = json_kwargs or {}
+    pickle_kwargs = pickle_kwargs or {}
+
+    encoded, name_object_map = partial_monty_encode(obj, json_kwargs)
+
+    if mkdir:
+        save_dir.mkdir(exist_ok=True, parents=True)
+
+    # Define the pickle path
+    pickle_path = save_dir / f"{json_path.stem}.pkl"
+
+    # Check if the files exist and the strict parameter is True
+    if strict and json_path.exists():
+        raise FileExistsError(f"strict is true and file {json_path} exists")
+    if strict and pickle_path.exists():
+        raise FileExistsError(f"strict is true and file {pickle_path} exists")
+
+    # Save the json file
+    with open(json_path, "w", encoding="utf-8") as outfile:
+        outfile.write(encoded)
+
+    # Save the pickle file if we have anything to save from the name_object_map
+    if name_object_map is not None:
+        with open(pickle_path, "wb") as f:
+            pickle.dump(name_object_map, f, **pickle_kwargs)
 
 
 def load(path):
@@ -489,7 +495,7 @@ def load(path):
     MSONable
     """
 
-    d = _d_from_path(path)
+    d = load2dict(path)
     module = d["@module"]
     klass = d["@class"]
     module = import_module(module)
@@ -497,7 +503,18 @@ def load(path):
     return klass.from_dict(d)
 
 
-def _d_from_path(file_path):
+def load2dict(file_path) -> dict:
+    """Load a serialized json file into a dictionary.
+
+    Assumes that you saved using `save` and will
+    load the json file into a dictionary.
+
+    Arg:
+        file_path: (str) Path to the json file.
+
+    Returns:
+        (dict) The dictionary representation of the json file.
+    """
     json_path = Path(file_path)
     save_dir = json_path.parent
     pickle_path = save_dir / f"{json_path.stem}.pkl"
@@ -579,6 +596,7 @@ class MontyEncoder(json.JSONEncoder):
                 "@module": "torch",
                 "@class": "Tensor",
                 "dtype": o.type(),
+                "size": list(o.size()),
             }
             if "Complex" in o.type():
                 d["data"] = [o.real.tolist(), o.imag.tolist()]
@@ -604,13 +622,13 @@ class MontyEncoder(json.JSONEncoder):
         if isinstance(o, np.generic):
             return o.item()
 
-        if _check_type(o, "pandas.core.frame.DataFrame"):
+        if _check_type(o, ("pandas.core.frame.DataFrame", "pandas.DataFrame")):
             return {
                 "@module": "pandas",
                 "@class": "DataFrame",
                 "data": o.to_json(default_handler=MontyEncoder().encode),
             }
-        if _check_type(o, "pandas.core.series.Series"):
+        if _check_type(o, ("pandas.core.series.Series", "pandas.Series")):
             return {
                 "@module": "pandas",
                 "@class": "Series",
@@ -809,13 +827,21 @@ class MontyDecoder(json.JSONDecoder):
                         import torch  # import torch is very expensive
 
                         if "Complex" in d["dtype"]:
+                            if "size" in d and d["data"] == [[], []]:
+                                return torch.empty(d["size"]).type(d["dtype"])
+
                             return torch.tensor(
                                 [
                                     np.array(r) + np.array(i) * 1j
                                     for r, i in zip(*d["data"])
                                 ],
                             ).type(d["dtype"])
-                        return torch.tensor(d["data"]).type(d["dtype"])
+
+                        else:
+                            if "size" in d and d["data"] == []:
+                                return torch.empty(d["size"]).type(d["dtype"])
+
+                            return torch.tensor(d["data"]).type(d["dtype"])
 
                     except ImportError:
                         pass
@@ -894,11 +920,6 @@ class MontyDecoder(json.JSONDecoder):
             # need to pass `json_options` to ensure that datetimes are not
             # converted by BSON
             d = json_util.loads(s, json_options=json_util.JSONOptions(tz_aware=True))
-        elif orjson is not None:
-            try:
-                d = orjson.loads(s)
-            except orjson.JSONDecodeError:
-                d = json.loads(s)
         else:
             d = json.loads(s)
         return self.process_decoded(d)
@@ -991,7 +1012,9 @@ def jsanitize(
         obj,
         (
             "pandas.core.series.Series",
+            "pandas.Series",
             "pandas.core.frame.DataFrame",
+            "pandas.DataFrame",
             "pandas.core.base.PandasObject",
         ),
     ):
@@ -1089,3 +1112,35 @@ def _serialize_callable(o):
         "@callable": getattr(o, "__qualname__", o.__name__),
         "@bound": bound,
     }
+
+
+def _get_partial_json(obj, json_kwargs):
+    """Gets the json representation of a class
+    with the unserializable components substituted for hash references."""
+    json_kwargs = json_kwargs or {}
+    encoder = MontyEncoder(allow_unserializable_objects=True, **json_kwargs)
+    encoded = encoder.encode(obj)
+    return encoder, encoded
+
+
+def partial_monty_encode(obj: object, json_kwargs=None):
+    """Encode an object that may contain unhashable parts.
+
+    Parameters
+    ----------
+    obj : object
+        The object to encode.
+    json_kwargs : dict
+        Keyword arguments to pass to the serializer.
+
+    Returns
+    -------
+    str, dict
+        The json encoding of the class and the name-object map if one is
+        required, otherwise None.
+    """
+    encoder, encoded = _get_partial_json(
+        obj=obj,
+        json_kwargs=json_kwargs,
+    )
+    return encoded, encoder._name_object_map

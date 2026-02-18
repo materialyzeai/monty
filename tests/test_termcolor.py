@@ -1,7 +1,3 @@
-"""
-TODO: Modify unittest doc.
-"""
-
 from __future__ import annotations
 
 import os
@@ -75,4 +71,4 @@ class TestFunc:
 
     def test_stream_has_colors(self):
         # TODO: not a real test. Need to do a proper test.
-        stream_has_colours(sys.stdout)
+        assert not stream_has_colours(sys.stdout)

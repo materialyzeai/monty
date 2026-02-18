@@ -1,29 +1,31 @@
-name: Linting
+name: Lint
 
 on: [push, pull_request]
 
 jobs:
   lint:
     runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Install uv with python version.
+        uses: astral-sh/setup-uv@v7
         with:
-          python-version: "3.x"
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
 
       - name: Install dependencies
         run: |
-          pip install --upgrade ruff mypy
+          uv sync --group lint
 
       - name: ruff
         run: |
-          ruff --version
-          ruff check .
-          ruff format --check .
+          uv run ruff --version
+          uv run ruff check src
+          uv run ruff format src --check
 
       - name: mypy
         run: |
-          mypy --version
-          mypy src
+          uv run mypy --version
+          uv run mypy -p monty

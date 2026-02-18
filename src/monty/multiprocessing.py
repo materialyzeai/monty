@@ -5,7 +5,10 @@ Multiprocessing utilities.
 from __future__ import annotations
 
 from multiprocessing import Pool
-from typing import Callable, Iterable
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from typing import Callable, Iterable
 
 try:
     from tqdm.autonotebook import tqdm
