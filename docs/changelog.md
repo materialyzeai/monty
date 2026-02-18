@@ -1,6 +1,6 @@
 # Change log
 
-## Unreleased
+## 2026.2.18
 - Drop Python 3.9 and 3.10 support.
 - Deprecate `delete_removed_files` from `ScratchDir` (#762, @DanielYang59)
 - Support JSON lines in load/dumpfn (#770, @esoteric-ephemera)
