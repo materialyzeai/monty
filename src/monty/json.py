@@ -28,6 +28,12 @@ if TYPE_CHECKING:
     from typing import Any
 
 try:
+    import pandas
+except ImportError:
+    pandas = None
+
+
+try:
     import bson
     from bson import json_util
 except ImportError:
@@ -623,13 +629,13 @@ class MontyEncoder(json.JSONEncoder):
         if isinstance(o, np.generic):
             return o.item()
 
-        if _check_type(o, "pandas.core.frame.DataFrame"):
+        if pandas and isinstance(o, pandas.DataFrame):
             return {
                 "@module": "pandas",
                 "@class": "DataFrame",
                 "data": o.to_json(default_handler=MontyEncoder().encode),
             }
-        if _check_type(o, "pandas.core.series.Series"):
+        if pandas and isinstance(o, pandas.Series):
             return {
                 "@module": "pandas",
                 "@class": "Series",
@@ -986,8 +992,8 @@ def jsanitize(
     if _check_type(
         obj,
         (
-            "pandas.core.series.Series",
-            "pandas.core.frame.DataFrame",
+            "pandas.Series",
+            "pandas.DataFrame",
             "pandas.core.base.PandasObject",
         ),
     ):
