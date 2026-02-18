@@ -146,7 +146,7 @@ def release(ctx: Context, notest: bool = False, version: str = NEW_VER) -> None:
     set_ver(ctx, version)
     if not notest:
         test(ctx)
-    update_doc(ctx)
+    # update_doc(ctx)
     commit(ctx)
     release_github(ctx)
     ctx.run("python -m build", warn=True)
