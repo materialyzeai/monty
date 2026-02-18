@@ -623,13 +623,13 @@ class MontyEncoder(json.JSONEncoder):
         if isinstance(o, np.generic):
             return o.item()
 
-        if _check_type(o, "pandas.core.frame.DataFrame"):
+        if _check_type(o, ("pandas.core.frame.DataFrame", "pandas.DataFrame")):
             return {
                 "@module": "pandas",
                 "@class": "DataFrame",
                 "data": o.to_json(default_handler=MontyEncoder().encode),
             }
-        if _check_type(o, "pandas.core.series.Series"):
+        if _check_type(o, ("pandas.core.series.Series", "pandas.Series")):
             return {
                 "@module": "pandas",
                 "@class": "Series",
@@ -987,7 +987,9 @@ def jsanitize(
         obj,
         (
             "pandas.core.series.Series",
+            "pandas.Series",
             "pandas.core.frame.DataFrame",
+            "pandas.DataFrame",
             "pandas.core.base.PandasObject",
         ),
     ):
