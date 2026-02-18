@@ -6,6 +6,7 @@ import os
 
 import pytest
 
+from monty.json import MSONable
 from monty.serialization import dumpfn, loadfn
 from monty.tempfile import ScratchDir
 
@@ -13,6 +14,23 @@ try:
     import msgpack
 except ImportError:
     msgpack = None
+
+
+class toyMsonable(MSONable):
+    """Dummy class to test de-/serialization."""
+
+    def __init__(self, a: int, b: str):
+        self.a = a
+        self.b = b
+
+    def __eq__(self, other):
+        if not isinstance(other, self.__class__):
+            return False
+
+        return all(
+            hasattr(other, attr) and getattr(other, attr, None) == getattr(self, attr)
+            for attr in {"a", "b"}
+        )
 
 
 class TestSerial:
@@ -23,7 +41,7 @@ class TestSerial:
         for fn in files_to_clean_up:
             os.remove(fn)
 
-    def test_dumpfn_loadfn(self):
+    def test_dumpfn_loadfn(self, tmp_dir):
         d = {"hello": "world"}
 
         # Test standard configuration
@@ -40,17 +58,14 @@ class TestSerial:
             dumpfn(d, fn)
             d2 = loadfn(fn)
             assert d == d2, f"Test file with extension {ext} did not parse correctly"
-            os.remove(fn)
 
         # Test custom kwarg configuration
         dumpfn(d, "monte_test.json", indent=4)
         d2 = loadfn("monte_test.json")
         assert d == d2
-        os.remove("monte_test.json")
         dumpfn(d, "monte_test.yaml")
         d2 = loadfn("monte_test.yaml")
         assert d == d2
-        os.remove("monte_test.yaml")
 
         # Check if fmt override works.
         dumpfn(d, "monte_test.json", fmt="yaml")
@@ -58,7 +73,6 @@ class TestSerial:
             loadfn("monte_test.json")
         d2 = loadfn("monte_test.json", fmt="yaml")
         assert d == d2
-        os.remove("monte_test.json")
 
         with pytest.raises(TypeError):
             dumpfn(d, "monte_test.txt", fmt="garbage")
@@ -66,14 +80,13 @@ class TestSerial:
             loadfn("monte_test.txt", fmt="garbage")
 
     @pytest.mark.skipif(msgpack is None, reason="msgpack-python not installed.")
-    def test_mpk(self):
+    def test_mpk(self, tmp_dir):
         d = {"hello": "world"}
 
         # Test automatic format detection
         dumpfn(d, "monte_test.mpk")
         d2 = loadfn("monte_test.mpk")
         assert d == d2
-        os.remove("monte_test.mpk")
 
         # Test to ensure basename is respected, and not directory
         with ScratchDir("."):
@@ -84,3 +97,20 @@ class TestSerial:
             with open("test_file.json", encoding="utf-8") as f:
                 reloaded = json.loads(f.read())
             assert reloaded["test"] == 1
+
+    def test_json_lines(self, tmp_dir):
+        d = [
+            {"obj": toyMsonable(a=i, b=str(i)), "other": 1.0, "stuff": {"c": 3, "d": 4}}
+            for i in range(5)
+        ]
+        dumpfn(d, "monte_test.jsonl.gz")
+        new_d = loadfn("monte_test.jsonl.gz")
+        assert all(new_d[i] == entry for i, entry in enumerate(d))
+        assert all(isinstance(entry["obj"], toyMsonable) for entry in new_d)
+
+        new_d = loadfn("monte_test.jsonl.gz", cls=None)
+        assert all(
+            isinstance(entry["obj"], dict)
+            and toyMsonable.from_dict(entry["obj"]) == d[i]["obj"]
+            for i, entry in enumerate(new_d)
+        )

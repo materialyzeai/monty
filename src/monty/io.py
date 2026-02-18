@@ -19,7 +19,9 @@ from pathlib import Path
 from typing import IO, TYPE_CHECKING, Any, Literal, cast, overload
 
 if TYPE_CHECKING:
-    from typing import Iterator, TypeAlias, Union
+    from typing import Iterator, TypeAlias
+
+    from monty.shutil import PathLike
 
 
 class EncodingWarning(Warning): ...  # Added in Python 3.10
@@ -39,13 +41,13 @@ BinModes: TypeAlias = Literal[
 
 
 @overload
-def zopen(filename: str | Path, mode: TextModes, **kwargs: Any) -> IO[str]: ...
+def zopen(filename: PathLike, mode: TextModes, **kwargs: Any) -> IO[str]: ...
 @overload
-def zopen(filename: str | Path, mode: BinModes, **kwargs: Any) -> IO[bytes]: ...
+def zopen(filename: PathLike, mode: BinModes, **kwargs: Any) -> IO[bytes]: ...
 @overload  # fallback
-def zopen(filename: str | Path, mode: str, **kwargs: Any) -> IO[Any]: ...
+def zopen(filename: PathLike, mode: str, **kwargs: Any) -> IO[Any]: ...
 def zopen(
-    filename: Union[str, Path],
+    filename: PathLike,
     mode: str,
     **kwargs: Any,
 ) -> IO[Any]:
@@ -168,7 +170,7 @@ def _get_line_ending(
 
 
 def reverse_readfile(
-    filename: Union[str, Path],
+    filename: PathLike,
 ) -> Iterator[str]:
     """
     A much faster reverse read of file by using Python's mmap to generate a

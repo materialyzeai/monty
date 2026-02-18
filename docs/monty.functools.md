@@ -73,13 +73,10 @@ becomes
 The decorated main accepts two new arguments:
 
 > prof_file: Name of the output file with profiling data
-
 > ```none
 > If not given, a temporary file is created.
 > ```
-
 > sortby: Profiling data are sorted according to this value.
-
 > ```none
 > default is “time”. See sort_stats.
 > ```
