@@ -22,7 +22,9 @@ except ImportError:
 
 if TYPE_CHECKING:
     from pathlib import Path
-    from typing import Any, TextIO, Union
+    from typing import Any, Literal, TextIO
+
+    from monty.shutil import PathLike
 
 _FILE_TYPE = Literal["json", "jsonl", "yaml", "mpk"]
 
@@ -37,9 +39,6 @@ def _identify_format(file_name: str | Path) -> _FILE_TYPE:
     elif "jsonl" in basename:
         return "jsonl"
     return "json"
-    from typing import Any, Literal, TextIO
-
-    from monty.shutil import PathLike
 
 
 def loadfn(
