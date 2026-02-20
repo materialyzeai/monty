@@ -545,7 +545,7 @@ def _recursive_name_object_map_replacement(d, name_object_map):
 class MontyEncoder(json.JSONEncoder):
     """
     A Json Encoder which supports the MSONable API, plus adds support for
-    NumPy arrays, datetime objects, bson ObjectIds (requires bson).
+    NumPy arrays, datetime objects, bson ObjectIds and DBRef (requires bson).
     Usage::
         # Add it as a *cls* keyword when using json.dump
         json.dumps(object, cls=MontyEncoder)
@@ -648,12 +648,18 @@ class MontyEncoder(json.JSONEncoder):
                 d["@version"] = None
             return d
 
-        if bson is not None and isinstance(o, bson.objectid.ObjectId):
-            return {
-                "@module": "bson.objectid",
-                "@class": "ObjectId",
-                "oid": str(o),
-            }
+        if bson is not None:
+            if isinstance(o, bson.objectid.ObjectId):
+                return {
+                    "@module": "bson.objectid",
+                    "@class": "ObjectId",
+                    "oid": str(o),
+                }
+            elif isinstance(o, bson.dbref.DBRef):
+                return {
+                    "@module": "bson.dbref",
+                    "@class": "DBRef",
+                } | o.as_doc()
 
         if callable(o) and not isinstance(o, MSONable):
             try:
@@ -764,6 +770,7 @@ class MontyDecoder(json.JSONDecoder):
             if classname:
                 if modname and modname not in {
                     "bson.objectid",
+                    "bson.dbref",
                     "numpy",
                     "pandas",
                     "pint",
@@ -875,6 +882,24 @@ class MontyDecoder(json.JSONDecoder):
                 ):
                     return bson.objectid.ObjectId(d["oid"])
 
+                elif (
+                    (bson is not None)
+                    and modname == "bson.dbref"
+                    and classname == "DBRef"
+                ):
+                    # DBRef supports arbitrary additional fields
+                    # therefore, the names of these keys are unknown in advance
+                    possible_extra_fields = {
+                        k: d[k]
+                        for k in d.keys() - {"@module", "@class", "$ref", "$id", "$db"}
+                    }
+                    return bson.dbref.DBRef(
+                        collection=d["$ref"],
+                        id=d["$id"],
+                        database=d.get("$db"),  # optional
+                        **possible_extra_fields,  # optional
+                    )
+
             return {
                 self.process_decoded(k): self.process_decoded(v) for k, v in d.items()
             }
@@ -929,7 +954,7 @@ def jsanitize(
             the object to a string representation.  If "skip" is provided,
             jsanitize will skip and return the original object without modification.
         allow_bson (bool): This parameter sets the behavior when jsanitize
-            encounters a bson supported type such as objectid and datetime. If
+            encounters a bson supported type such as ObjectID, datetime and DBRef. If
             True, such bson types will be ignored, allowing for proper
             insertion into MongoDB databases.
         enum_values (bool): Convert Enums to their values.
@@ -949,6 +974,7 @@ def jsanitize(
     if allow_bson and (
         isinstance(obj, (datetime.datetime, bytes))
         or (bson is not None and isinstance(obj, bson.objectid.ObjectId))
+        or (bson is not None and isinstance(obj, bson.dbref.DBRef))
     ):
         return obj
 
