@@ -205,8 +205,10 @@ class MSONable:
         return d
 
     @classmethod
-    def from_dict(cls, d):
-        """Args:
+    def from_dict(cls, d: dict) -> MSONable:
+        """Reconstruct an MSONable object from a dict.
+
+        Args:
             d: Dict representation.
 
         Returns:
@@ -223,10 +225,12 @@ class MSONable:
         """Returns a json string representation of the MSONable object."""
         return json.dumps(self, cls=MontyEncoder)
 
-    def unsafe_hash(self):
-        """Returns an hash of the current object. This uses a generic but low
-        performance method of converting the object to a dictionary, flattening
-        any nested keys, and then performing a hash on the resulting object.
+    def unsafe_hash(self) -> Any:
+        """Return a hash of the current object.
+
+        This uses a generic but low performance method of converting the
+        object to a dictionary, flattening any nested keys, and then
+        performing a hash on the resulting object.
         """
 
         def flatten(obj, separator="."):
@@ -337,12 +341,12 @@ class MSONable:
 
     def save(
         self,
-        json_path,
-        mkdir=True,
-        json_kwargs=None,
-        pickle_kwargs=None,
-        strict=True,
-    ):
+        json_path: os.PathLike | str,
+        mkdir: bool = True,
+        json_kwargs: dict | None = None,
+        pickle_kwargs: dict | None = None,
+        strict: bool = True,
+    ) -> None:
         """Utility that uses the standard tools of MSONable to convert the
         class to json format, but also save it to disk. In addition, this
         method intelligently uses pickle to individually pickle class objects
@@ -382,7 +386,7 @@ class MSONable:
         )
 
     @classmethod
-    def load(cls, file_path):
+    def load(cls, file_path: os.PathLike | str) -> MSONable:
         """Loads a class from a provided json file.
 
         Parameters
@@ -400,13 +404,13 @@ class MSONable:
 
 
 def save(
-    obj,
-    json_path,
-    mkdir=True,
-    json_kwargs=None,
-    pickle_kwargs=None,
-    strict=True,
-):
+    obj: Any,
+    json_path: os.PathLike | str,
+    mkdir: bool = True,
+    json_kwargs: dict | None = None,
+    pickle_kwargs: dict | None = None,
+    strict: bool = True,
+) -> None:
     """Utility that uses the standard tools of MSONable to convert the
     class to json format, but also save it to disk. In addition, this
     method intelligently uses pickle to individually pickle class objects
@@ -467,7 +471,7 @@ def save(
             pickle.dump(name_object_map, f, **pickle_kwargs)
 
 
-def load(path):
+def load(path: os.PathLike | str) -> MSONable:
     """Loads a json file that was saved using MSONable.save.
 
     Parameters
@@ -487,7 +491,7 @@ def load(path):
     return klass.from_dict(d)
 
 
-def load2dict(file_path) -> dict:
+def load2dict(file_path: os.PathLike | str) -> dict:
     """Load a serialized json file into a dictionary.
 
     Assumes that you saved using `save` and will
@@ -701,7 +705,7 @@ class MontyDecoder(json.JSONDecoder):
         json.loads(json_string, cls=MontyDecoder)
     """
 
-    def process_decoded(self, d):
+    def process_decoded(self, d: Any) -> Any:
         """Recursive method to support decoding dicts and lists containing
         pymatgen objects.
         """
@@ -864,11 +868,14 @@ class MontyDecoder(json.JSONDecoder):
 
         return d
 
-    def decode(self, s):
-        """Overrides decode from JSONDecoder.
+    def decode(self, s: str) -> Any:
+        """Override decode from JSONDecoder.
 
-        :param s: string
-        :return: Object.
+        Args:
+            s: JSON string.
+
+        Returns:
+            Decoded object.
         """
         if bson is not None:
             # need to pass `json_options` to ensure that datetimes are not
@@ -884,12 +891,12 @@ class MSONError(Exception):
 
 
 def jsanitize(
-    obj,
-    strict=False,
-    allow_bson=False,
-    enum_values=False,
-    recursive_msonable=False,
-):
+    obj: Any,
+    strict: bool = False,
+    allow_bson: bool = False,
+    enum_values: bool = False,
+    recursive_msonable: bool = False,
+) -> Any:
     """This method cleans an input json-like object, either a list or a dict or
     some sequence, nested or otherwise, by converting all non-string
     dictionary keys (such as int and float) to strings, and also recursively
@@ -1074,7 +1081,9 @@ def _get_partial_json(obj, json_kwargs):
     return encoder, encoded
 
 
-def partial_monty_encode(obj: object, json_kwargs=None):
+def partial_monty_encode(
+    obj: object, json_kwargs: dict | None = None
+) -> tuple[str, dict | None]:
     """Encode an object that may contain unhashable parts.
 
     Parameters

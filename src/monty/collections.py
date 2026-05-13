@@ -125,13 +125,13 @@ class ControlledDict(collections.UserDict, ABC):
             raise TypeError(f"Cannot delete key {key!r}, because delete is disabled.")
         super().__delitem__(key)
 
-    def pop(self, key, *args):
+    def pop(self, key: Any, *args: Any) -> Any:
         """Forbid popping keys when self._allow_del is False."""
         if not self._allow_del:
             raise TypeError(f"Cannot pop key {key!r}, because delete is disabled.")
         return super().pop(key, *args)
 
-    def popitem(self):
+    def popitem(self) -> tuple[Any, Any]:
         """Forbid popping the last item when self._allow_del is False."""
         if not self._allow_del:
             raise TypeError("Cannot pop item, because delete is disabled.")

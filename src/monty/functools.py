@@ -204,7 +204,7 @@ class timeout:
         self.seconds = seconds
         self.error_message = error_message
 
-    def handle_timeout(self, signum, frame):
+    def handle_timeout(self, signum: int, frame: Any) -> None:
         """Signal handler that raises TimeoutError.
 
         Args:
@@ -213,11 +213,11 @@ class timeout:
         """
         raise TimeoutError(self.error_message)
 
-    def __enter__(self):
+    def __enter__(self) -> None:
         signal.signal(signal.SIGALRM, self.handle_timeout)
         signal.alarm(self.seconds)
 
-    def __exit__(self, type, value, traceback):
+    def __exit__(self, type: Any, value: Any, traceback: Any) -> None:  # noqa: A002
         signal.alarm(0)
 
 
@@ -231,7 +231,7 @@ class TimeoutError(Exception):
         self.message = message
 
 
-def prof_main(main):
+def prof_main(main: Callable) -> Callable:
     """Decorator for profiling main programs.
 
     Profiling is activated by prepending the command line options

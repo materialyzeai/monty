@@ -19,7 +19,7 @@ def all_subclasses(cls: type) -> list[type]:
     return subclasses + [g for s in subclasses for g in all_subclasses(s)]
 
 
-def find_top_pyfile():
+def find_top_pyfile() -> str:
     """This function inspects the Cpython frame to find the path of the script."""
     frame = currentframe()
     while True:

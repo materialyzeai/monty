@@ -9,10 +9,11 @@ from typing import TYPE_CHECKING, TypeVar
 from weakref import WeakValueDictionary
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
     from typing import Any
 
 
-def singleton(cls):
+def singleton(cls: type) -> Callable[[], Any]:
     """This decorator can be used to create a singleton out of a class.
 
     Usage:
@@ -22,9 +23,9 @@ def singleton(cls):
             def __init__():
                 pass
     """
-    instances = {}
+    instances: dict[type, Any] = {}
 
-    def getinstance():
+    def getinstance() -> Any:
         if cls not in instances:
             instances[cls] = cls()
         return instances[cls]
@@ -121,5 +122,5 @@ class NullFile:
 class NullStream:
     """A fake stream with a no-op write."""
 
-    def write(self, *args):  # pylint: disable=E0211
-        """Does nothing..."""
+    def write(self, *args: Any) -> None:  # pylint: disable=E0211
+        """Do nothing."""
