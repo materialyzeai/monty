@@ -1,6 +1,4 @@
-"""
-functools, especially backported from Python 3.
-"""
+"""functools, especially backported from Python 3."""
 
 from __future__ import annotations
 
@@ -18,8 +16,7 @@ if TYPE_CHECKING:
 
 
 class _HashedSeq(list):  # pylint: disable=C0205
-    """
-    This class guarantees that hash() will be called no more than once
+    """This class guarantees that hash() will be called no more than once
     per element.  This is important because the lru_cache() will hash
     the key multiple times on a cache miss.
     """
@@ -27,10 +24,9 @@ class _HashedSeq(list):  # pylint: disable=C0205
     __slots__ = "hashvalue"
 
     def __init__(self, tup: tuple, hashfunc: Callable = hash) -> None:
-        """
-        Args:
-            tup: Tuple.
-            hashfunc: Hash function.
+        """Args:
+        tup: Tuple.
+        hashfunc: Hash function.
         """
         self[:] = tup
         self.hashvalue: int = hashfunc(tup)
@@ -46,8 +42,7 @@ def _make_key(
     kwd_mark: tuple[object] = (object(),),
     fasttypes=None,
 ) -> Any:
-    """
-    Make a cache key from optionally typed positional and keyword arguments
+    """Make a cache key from optionally typed positional and keyword arguments.
 
     The key is constructed in a way that is flat as possible rather than
     as a nested structure that would take more memory.
@@ -72,17 +67,15 @@ def _make_key(
 
 
 class lazy_property:
-    """
-    lazy_property descriptor
+    """lazy_property descriptor.
 
     Used as a decorator to create lazy attributes. Lazy attributes
     are evaluated on first use.
     """
 
     def __init__(self, func: Callable) -> None:
-        """
-        Args:
-            func: Function to decorate.
+        """Args:
+        func: Function to decorate.
         """
         self.__func = func
         wraps(self.__func)(self)  # type: ignore[arg-type]
@@ -133,8 +126,7 @@ class lazy_property:
 def return_if_raise(
     exception_tuple: list | tuple, retval_if_exc: Any, disabled: bool = False
 ) -> Any:
-    """
-    Decorator for functions, methods or properties. Execute the callable in a
+    """Decorator for functions, methods or properties. Execute the callable in a
     try block, and return retval_if_exc if one of the exceptions listed in
     exception_tuple is raised (se also ``return_node_if_raise``).
 
@@ -192,8 +184,7 @@ This decorator returns None if one of the exceptions is raised.
 
 
 class timeout:
-    """
-    Timeout function. Use to limit matching to a certain time limit. Note that
+    """Timeout function. Use to limit matching to a certain time limit. Note that
     this works only on Unix-based systems as it uses signal.
 
     Usage:
@@ -205,20 +196,20 @@ class timeout:
     """
 
     def __init__(self, seconds: int = 1, error_message: str = "Timeout"):
-        """
-        Args:
-            seconds (int): Allowed time for function in seconds.
-            error_message (str): An error message.
+        """Args:
+        seconds (int): Allowed time for function in seconds.
+        error_message (str): An error message.
 
         """
         self.seconds = seconds
         self.error_message = error_message
 
     def handle_timeout(self, signum, frame):
-        """
+        """Signal handler that raises TimeoutError.
+
         Args:
             signum: Return signal from call.
-            frame:
+            frame: Current stack frame.
         """
         raise TimeoutError(self.error_message)
 
@@ -231,27 +222,22 @@ class timeout:
 
 
 class TimeoutError(Exception):
-    """
-    Exception class for timeouts.
-    """
+    """Exception class for timeouts."""
 
     def __init__(self, message: str):
-        """
-        Args:
-            message: Error message
+        """Args:
+        message: Error message.
         """
         self.message = message
 
 
 def prof_main(main):
-    """
-    Decorator for profiling main programs.
+    """Decorator for profiling main programs.
 
     Profiling is activated by prepending the command line options
     supported by the original main program with the keyword `prof`.
 
     Examples:
-
             $ script.py arg --foo=1
 
         becomes

@@ -1,6 +1,4 @@
-"""
-Multiprocessing utilities.
-"""
+"""Multiprocessing utilities."""
 
 from __future__ import annotations
 
@@ -17,8 +15,7 @@ except ImportError as exc:
 
 
 def imap_tqdm(nprocs: int, func: Callable, iterable: Iterable, *args, **kwargs) -> list:
-    """
-    A wrapper around Pool.imap. Creates a Pool with nprocs and then runs a f
+    """A wrapper around Pool.imap. Creates a Pool with nprocs and then runs a f
     unction over an iterable with progress bar.
 
     Args:

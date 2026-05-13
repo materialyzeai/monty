@@ -1,15 +1,14 @@
-"""
-Useful collection classes:
-    - tree: A recursive `defaultdict` for creating nested dictionaries
-        with default values.
-    - ControlledDict: A base dict class with configurable mutability.
-    - frozendict: An immutable dictionary.
-    - Namespace: A dict doesn't allow changing values, but could
-        add new keys,
-    - AttrDict: A dict whose values could be access as `dct.key`.
-    - FrozenAttrDict: An immutable version of `AttrDict`.
-    - MongoDict: A dict-like object whose values are nested dicts
-        could be accessed as attributes.
+"""Useful collection classes:
+- tree: A recursive `defaultdict` for creating nested dictionaries
+    with default values.
+- ControlledDict: A base dict class with configurable mutability.
+- frozendict: An immutable dictionary.
+- Namespace: A dict doesn't allow changing values, but could
+    add new keys,
+- AttrDict: A dict whose values could be access as `dct.key`.
+- FrozenAttrDict: An immutable version of `AttrDict`.
+- MongoDict: A dict-like object whose values are nested dicts
+    could be accessed as attributes.
 """
 
 from __future__ import annotations
@@ -25,8 +24,7 @@ if TYPE_CHECKING:
 
 
 def tree() -> collections.defaultdict:
-    """
-    A tree object, which is effectively a recursive defaultdict that
+    """A tree object, which is effectively a recursive defaultdict that
     adds tree as members.
 
     Usage:
@@ -40,8 +38,7 @@ def tree() -> collections.defaultdict:
 
 
 class ControlledDict(collections.UserDict, ABC):
-    """
-    A base dictionary class with configurable mutability.
+    """A base dictionary class with configurable mutability.
 
     Attributes:
         _allow_add (bool): Whether new keys can be added.
@@ -90,7 +87,6 @@ class ControlledDict(collections.UserDict, ABC):
 
     def update(self, *args, **kwargs) -> None:
         """Forbid adding or updating keys based on _allow_add and _allow_update."""
-
         updates = dict(*args, **kwargs)
         for key in updates:
             if key not in self.data and not self._allow_add:
@@ -149,8 +145,7 @@ class ControlledDict(collections.UserDict, ABC):
 
 
 class frozendict(ControlledDict):
-    """
-    A dictionary that does not permit changes. The naming
+    """A dictionary that does not permit changes. The naming
     violates PEP 8 to be consistent with the built-in `frozenset` naming.
     """
 
@@ -168,8 +163,7 @@ class Namespace(ControlledDict):
 
 
 class AttrDict(dict):
-    """
-    Allow accessing values as `dct.key` in addition to the traditional way `dct["key"]`.
+    """Allow accessing values as `dct.key` in addition to the traditional way `dct["key"]`.
 
     Examples:
         >>> dct = AttrDict(foo=1, bar=2)
@@ -201,11 +195,10 @@ class AttrDict(dict):
 
 
 class FrozenAttrDict(frozendict):
-    """
-    A dictionary that:
-        - Does not permit changes (add/update/delete).
-        - Allows accessing values as `dct.key` in addition to
-            the traditional way `dct["key"]`.
+    """A dictionary that:
+    - Does not permit changes (add/update/delete).
+    - Allows accessing values as `dct.key` in addition to
+        the traditional way `dct["key"]`.
     """
 
     def __init__(self, *args, **kwargs) -> None:
@@ -232,8 +225,7 @@ class FrozenAttrDict(frozendict):
 
 
 class MongoDict:
-    """
-    This dict-like object allows one to access the entries in a nested dict as
+    """This dict-like object allows one to access the entries in a nested dict as
     attributes.
     Entries (attributes) cannot be modified. It also provides Ipython tab
     completion hence this object is particularly useful if you need to analyze
@@ -253,10 +245,9 @@ class MongoDict:
     """
 
     def __init__(self, *args, **kwargs) -> None:
-        """
-        Args:
-            args: Passthrough arguments for standard dict.
-            kwargs: Passthrough keyword arguments for standard dict.
+        """Args:
+        args: Passthrough arguments for standard dict.
+        kwargs: Passthrough keyword arguments for standard dict.
         """
         self.__dict__["_mongo_dict_"] = dict(*args, **kwargs)
 
@@ -293,16 +284,14 @@ class MongoDict:
         return len(self._mongo_dict_)
 
     def __dir__(self) -> list:
-        """
-        For Ipython tab completion.
-        See http://ipython.org/ipython-doc/dev/config/integrating.html
+        """For Ipython tab completion.
+        See http://ipython.org/ipython-doc/dev/config/integrating.html.
         """
         return sorted(k for k in self._mongo_dict_ if not callable(k))
 
 
 def dict2namedtuple(*args, **kwargs) -> tuple:
-    """
-    Helper function to create a `namedtuple` from a dictionary.
+    """Helper function to create a `namedtuple` from a dictionary.
 
     Examples:
         >>> tpl = dict2namedtuple(foo=1, bar="hello")

@@ -1,5 +1,4 @@
-"""
-This module implements several useful functions and decorators that can be
+"""This module implements several useful functions and decorators that can be
 particularly useful for developers. E.g., deprecating methods / classes, etc.
 """
 
@@ -23,8 +22,7 @@ def deprecated(
     deadline: tuple[int, int, int] | None = None,
     category: type[Warning] = FutureWarning,
 ) -> Callable:
-    """
-    Decorator to mark classes or functions as deprecated, with a possible replacement.
+    """Decorator to mark classes or functions as deprecated, with a possible replacement.
 
     Args:
         replacement (Callable | str): A replacement class or function.
@@ -122,12 +120,12 @@ def deprecated(
 
 
 class requires:
-    """
-    Decorator to mark classes or functions as requiring a specified condition
-    to be true. This can be used to present useful error messages for
-    optional dependencies. For example, decorating the following code will
-    check if scipy is present and if not, a runtime error will be raised if
-    someone attempts to call the use_scipy function:
+    """Decorator to mark classes or functions as requiring a specified condition.
+
+    This can be used to present useful error messages for optional
+    dependencies. For example, decorating the following code will check if
+    scipy is present and if not, a runtime error will be raised if someone
+    attempts to call the use_scipy function:
 
         try:
             import scipy
@@ -146,19 +144,17 @@ class requires:
     def __init__(
         self, condition: bool, message: str, err_cls: type[Exception] = RuntimeError
     ) -> None:
-        """
-        Args:
-            condition: A expression returning a bool.
-            message: Message to display if condition is False.
+        """Args:
+        condition: A expression returning a bool.
+        message: Message to display if condition is False.
         """
         self.condition = condition
         self.message = message
         self.err_cls = err_cls
 
     def __call__(self, _callable: Callable) -> Callable:
-        """
-        Args:
-            _callable: Callable function.
+        """Args:
+        _callable: Callable function.
         """
 
         @functools.wraps(_callable)
@@ -171,8 +167,7 @@ class requires:
 
 
 def install_excepthook(hook_type: str = "color", **kwargs) -> int:
-    """
-    This function replaces the original python traceback with an improved
+    """This function replaces the original python traceback with an improved
     version from Ipython. Use `color` for colourful traceback formatting,
     `verbose` for Ka-Ping Yee's "cgitb.py" version kwargs are the keyword
     arguments passed to the constructor. See IPython.core.ultratb.py for more

@@ -1,5 +1,4 @@
-"""
-This module implements serialization support for common formats such as json
+"""This module implements serialization support for common formats such as json
 and yaml.
 """
 
@@ -47,8 +46,7 @@ def loadfn(
     fmt: _FILE_TYPE | None = None,
     **kwargs,
 ) -> Any:
-    """
-    Loads json/yaml/msgpack directly from a filename instead of a
+    """Loads json/yaml/msgpack directly from a filename instead of a
     File-like object. File may also be a BZ2 (".BZ2") or GZIP (".GZ", ".Z")
     compressed file.
     For YAML, ruamel.yaml must be installed. The file type is automatically
@@ -68,7 +66,6 @@ def loadfn(
     Returns:
         object: Result of json/yaml/msgpack.load.
     """
-
     fmt = fmt or _identify_format(fn)
 
     if fmt == "mpk":
@@ -106,8 +103,7 @@ def dumpfn(
     fmt: _FILE_TYPE | None = None,
     **kwargs,
 ) -> None:
-    """
-    Dump to a json/yaml directly by filename instead of a
+    """Dump to a json/yaml directly by filename instead of a
     File-like object. File may also be a BZ2 (".BZ2") or GZIP (".GZ", ".Z")
     compressed file.
     For YAML, ruamel.yaml must be installed. The file type is automatically

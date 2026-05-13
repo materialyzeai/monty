@@ -1,6 +1,4 @@
-"""
-Addition math functions.
-"""
+"""Addition math functions."""
 
 from __future__ import annotations
 
@@ -8,8 +6,7 @@ import math
 
 
 def nCr(n: int, r: int) -> int:
-    """
-    Calculates nCr (binomial coefficient or "n choose r").
+    """Calculates nCr (binomial coefficient or "n choose r").
 
     Args:
         n (int): total number of items.
@@ -23,8 +20,7 @@ def nCr(n: int, r: int) -> int:
 
 
 def nPr(n: int, r: int) -> int:
-    """
-    Calculates nPr.
+    """Calculates nPr.
 
     Args:
         n (int): total number of items.

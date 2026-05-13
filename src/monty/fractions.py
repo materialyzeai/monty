@@ -1,6 +1,4 @@
-"""
-Math functions.
-"""
+"""Math functions."""
 
 from __future__ import annotations
 
@@ -12,8 +10,7 @@ if TYPE_CHECKING:
 
 
 def gcd(*numbers: int) -> int:
-    """
-    Returns the greatest common divisor for a sequence of numbers.
+    """Returns the greatest common divisor for a sequence of numbers.
 
     Args:
         *numbers: Sequence of numbers.
@@ -28,8 +25,7 @@ def gcd(*numbers: int) -> int:
 
 
 def lcm(*numbers: int) -> int:
-    """
-    Return lowest common multiple of a sequence of numbers.
+    """Return lowest common multiple of a sequence of numbers.
 
     Args:
         *numbers: Sequence of numbers.
@@ -44,9 +40,8 @@ def lcm(*numbers: int) -> int:
 
 
 def gcd_float(numbers: Sequence[float], tol: float = 1e-8) -> float:
-    """
-    Returns the greatest common divisor for a sequence of numbers.
-    Uses a numerical tolerance, so can be used on floats
+    """Returns the greatest common divisor for a sequence of numbers.
+    Uses a numerical tolerance, so can be used on floats.
 
     Args:
         numbers: Sequence of numbers.

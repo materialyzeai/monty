@@ -1,6 +1,4 @@
-"""
-Calling shell processes.
-"""
+"""Calling shell processes."""
 
 from __future__ import annotations
 
@@ -26,8 +24,7 @@ __date__ = "10/26/14"
 
 
 class Command:
-    """
-    Enables to run subprocess commands in a different thread with TIMEOUT
+    """Enables to run subprocess commands in a different thread with TIMEOUT
     option.
 
     Based on jcollado's solution:
@@ -48,9 +45,8 @@ class Command:
     """
 
     def __init__(self, command: str):
-        """
-        Args:
-            command: Command to execute
+        """Args:
+        command: Command to execute.
         """
         if is_string(command):
             _command: list[str] = shlex.split(command)
@@ -64,8 +60,7 @@ class Command:
         return f"command: {self.command}, retcode: {self.retcode}"
 
     def run(self, timeout: float | None = None, **kwargs) -> Self:
-        """
-        Run a command in a separated thread and wait timeout seconds.
+        """Run a command in a separated thread and wait timeout seconds.
         kwargs are keyword arguments passed to Popen.
 
         Returns:

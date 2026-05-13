@@ -1,6 +1,4 @@
-"""
-Logging tools
-"""
+"""Logging tools."""
 
 from __future__ import annotations
 
@@ -15,8 +13,7 @@ if TYPE_CHECKING:
 
 
 def logged(level: int = logging.DEBUG) -> Callable:
-    """
-    Useful logging decorator. If a method is logged, the beginning and end of
+    """Useful logging decorator. If a method is logged, the beginning and end of
     the method call will be logged at a pre-specified level.
 
     Args:
@@ -44,12 +41,11 @@ def logged(level: int = logging.DEBUG) -> Callable:
 
 
 def enable_logging(main: Callable) -> Callable:
-    """
-    This decorator is used to decorate main functions.
+    """This decorator is used to decorate main functions.
     It adds the initialization of the logger and an argument parser that allows
     one to select the loglevel.
     Useful if we are writing simple main functions that call libraries where
-    the logging module is used
+    the logging module is used.
 
     Args:
         main: The main function.

@@ -1,6 +1,4 @@
-"""
-Useful additional functions to help get information about live objects
-"""
+"""Useful additional functions to help get information about live objects."""
 
 from __future__ import annotations
 
@@ -14,8 +12,7 @@ if TYPE_CHECKING:
 
 
 def all_subclasses(cls: type) -> list[type]:
-    """
-    Given a class `cls`, this recursive function returns a list with
+    """Given a class `cls`, this recursive function returns a list with
     all subclasses, subclasses of subclasses, and so on.
     """
     subclasses = cls.__subclasses__()
@@ -23,9 +20,7 @@ def all_subclasses(cls: type) -> list[type]:
 
 
 def find_top_pyfile():
-    """
-    This function inspects the Cpython frame to find the path of the script.
-    """
+    """This function inspects the Cpython frame to find the path of the script."""
     frame = currentframe()
     while True:
         if frame.f_back is None:
@@ -36,8 +31,7 @@ def find_top_pyfile():
 
 
 def caller_name(skip: Literal[1, 2] = 2) -> str:
-    """
-    Get a name of a caller in the format module.class.method
+    """Get a name of a caller in the format module.class.method.
 
     `skip` specifies how many levels of stack to skip while getting caller
     name. skip=1 means "who calls me", skip=2 "who calls my caller" etc.

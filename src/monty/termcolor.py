@@ -1,5 +1,4 @@
-"""
-Copyright (c) 2008-2011 Volvox Development Team
+"""Copyright (c) 2008-2011 Volvox Development Team.
 
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -74,7 +73,7 @@ __ISON = True
 
 
 def enable(true_false: bool) -> None:
-    """Enable/Disable ANSII Color formatting"""
+    """Enable/Disable ANSII Color formatting."""
     global __ISON
     __ISON = true_false
 
@@ -85,9 +84,7 @@ def ison() -> bool:
 
 
 def stream_has_colours(stream: object) -> bool:
-    """
-    True if stream supports colours. Python cookbook, #475186
-    """
+    """True if stream supports colours. Python cookbook, #475186."""
     if not hasattr(stream, "isatty"):
         return False
 
@@ -118,7 +115,6 @@ def colored(
         colored('Hello, World!', 'red', 'on_grey', ['blue', 'blink'])
         colored('Hello, World!', 'green')
     """
-
     if __ISON and os.getenv("ANSI_COLORS_DISABLED") is None:
         fmt_str = "\033[%dm%s"
         if color:
@@ -146,8 +142,7 @@ def cprint(
 
 
 def colored_map(text: str, cmap: dict) -> str:
-    """
-    Return colorized text. cmap is a dict mapping tokens to color options.
+    """Return colorized text. cmap is a dict mapping tokens to color options.
 
     colored_key("foo bar", {bar: "green"})
     colored_key("foo bar", {bar: {"color": "green", "on_color": "on_red"}})
@@ -163,10 +158,9 @@ def colored_map(text: str, cmap: dict) -> str:
 
 
 def cprint_map(text: str, cmap: dict, **kwargs) -> None:
-    """
-    Print colorize text.
+    """Print colorize text.
     cmap is a dict mapping keys to color options.
-    kwargs are passed to print function
+    kwargs are passed to print function.
 
     Examples:
         cprint_map("Hello world", {"Hello": "red"})
@@ -175,8 +169,7 @@ def cprint_map(text: str, cmap: dict, **kwargs) -> None:
 
 
 def get_terminal_size():
-    """
-    Return the size of the terminal as (nrow, ncols)
+    """Return the size of the terminal as (nrow, ncols).
 
     Based on:
 

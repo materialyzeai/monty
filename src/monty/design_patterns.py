@@ -1,6 +1,4 @@
-"""
-Some common design patterns such as singleton and cached classes.
-"""
+"""Some common design patterns such as singleton and cached classes."""
 
 from __future__ import annotations
 
@@ -15,8 +13,7 @@ if TYPE_CHECKING:
 
 
 def singleton(cls):
-    """
-    This decorator can be used to create a singleton out of a class.
+    """This decorator can be used to create a singleton out of a class.
 
     Usage:
         @singleton
@@ -25,7 +22,6 @@ def singleton(cls):
             def __init__():
                 pass
     """
-
     instances = {}
 
     def getinstance():
@@ -41,8 +37,7 @@ Klass = TypeVar("Klass")
 
 
 def cached_class(cls: type[Klass]) -> type[Klass]:
-    """
-    Decorator to cache class instances by constructor arguments.
+    """Decorator to cache class instances by constructor arguments.
     This results in a class that behaves like a singleton for each
     set of constructor arguments, ensuring efficiency.
 
@@ -116,19 +111,15 @@ class NullFile:
     """A file object that is associated to /dev/null."""
 
     def __new__(cls):
-        """
-        Pass through.
-        """
+        """Pass through."""
         return open(os.devnull, "w")  # pylint: disable=R1732
 
     def __init__(self):
-        """no-op"""
+        """no-op."""
 
 
 class NullStream:
     """A fake stream with a no-op write."""
 
     def write(self, *args):  # pylint: disable=E0211
-        """
-        Does nothing...
-        """
+        """Does nothing..."""

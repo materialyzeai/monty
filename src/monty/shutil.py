@@ -18,8 +18,7 @@ PathLike: TypeAlias = str | Path
 
 
 def copy_r(src: PathLike, dst: PathLike) -> None:
-    """
-    Deprecated: please use `shutil.copytree(src, dst, dirs_exist_ok=True)`,
+    """Deprecated: please use `shutil.copytree(src, dst, dirs_exist_ok=True)`,
     use the `symlinks` arg to control whether you want to dereference symlinks.
 
     Implements a recursive copy function similar to Unix's "cp -r" command.
@@ -40,8 +39,7 @@ def copy_r(src: PathLike, dst: PathLike) -> None:
 
 
 def gzip_dir(path: PathLike, compresslevel: int = 6) -> None:
-    """
-    Gzips all files in a directory. Note that this is different from
+    """Gzips all files in a directory. Note that this is different from
     shutil.make_archive, which creates a tar archive. The aim of this method
     is to create gzipped files that can still be read using common Unix-style
     commands like zless or zcat.
@@ -75,8 +73,7 @@ def compress_file(
     compression: Literal["gz", "bz2"] = "gz",
     target_dir: PathLike | None = None,
 ) -> None:
-    """
-    Compresses a file with the correct extension. Functions like standard
+    """Compresses a file with the correct extension. Functions like standard
     Unix command line gzip and bzip2 in the sense that the original
     uncompressed files are not retained.
 
@@ -108,8 +105,7 @@ def compress_file(
 
 
 def compress_dir(path: PathLike, compression: Literal["gz", "bz2"] = "gz") -> None:
-    """
-    Recursively compresses all files in a directory. Note that this
+    """Recursively compresses all files in a directory. Note that this
     compresses all files singly, i.e., it does not create a tar archive. For
     that, just use Python tarfile class.
 
@@ -129,8 +125,7 @@ def compress_dir(path: PathLike, compression: Literal["gz", "bz2"] = "gz") -> No
 def decompress_file(
     filepath: PathLike, target_dir: PathLike | None = None
 ) -> str | None:
-    """
-    Decompresses a file with the correct extension. Automatically detects
+    """Decompresses a file with the correct extension. Automatically detects
     gz, bz2 or z extension.
 
     Args:
@@ -164,8 +159,7 @@ def decompress_file(
 
 
 def decompress_dir(path: PathLike) -> None:
-    """
-    Recursively decompresses all files in a directory.
+    """Recursively decompresses all files in a directory.
 
     Args:
         path (PathLike): Path to parent directory.
@@ -177,8 +171,7 @@ def decompress_dir(path: PathLike) -> None:
 
 
 def remove(path: PathLike, follow_symlink: bool = False) -> None:
-    """
-    Implements a remove function that will delete files, folder trees and
+    """Implements a remove function that will delete files, folder trees and
     symlink trees.
 
     1.) Remove a file

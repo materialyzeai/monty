@@ -1,5 +1,4 @@
-"""
-Additional bisect functions. Taken from
+"""Additional bisect functions. Taken from
 https://docs.python.org/2/library/bisect.html
 The above bisect() functions are useful for finding insertion points but can be
 tricky or awkward to use for common searching tasks.

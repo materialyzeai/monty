@@ -1,6 +1,4 @@
-"""
-Pretty printing functions.
-"""
+"""Pretty printing functions."""
 
 from __future__ import annotations
 
@@ -17,8 +15,7 @@ if TYPE_CHECKING:
 def pprint_table(
     table: list[list], out: TextIO = sys.stdout, rstrip: bool = False
 ) -> None:
-    """
-    Prints out a table of data, padded for alignment
+    """Prints out a table of data, padded for alignment
     Each row must have the same number of columns.
 
     Args:
@@ -49,8 +46,7 @@ def pprint_table(
 
 
 def draw_tree(node, child_iter=lambda n: n.children, text_str=str):
-    """
-    Args:
+    """Args:
         node: the root of the tree to be drawn,
         child_iter: function that when called with a node, returns an iterable
             over all its children
@@ -86,14 +82,10 @@ def _draw_tree(node, prefix: str, child_iter: Callable, text_str: Callable):
 
 
 class DisplayEcoder(JSONEncoder):
-    """
-    Help convert dicts and objects to a format that can be displayed in notebooks
-    """
+    """Help convert dicts and objects to a format that can be displayed in notebooks."""
 
     def default(self, o):
-        """
-        Try different ways of converting the present object for displaying
-        """
+        """Try different ways of converting the present object for displaying."""
         try:
             return o.as_dict()
         except Exception:
@@ -113,8 +105,7 @@ class DisplayEcoder(JSONEncoder):
 
 
 def pprint_json(data):
-    """
-    Display a tree-like object in a jupyter notebook.
+    """Display a tree-like object in a jupyter notebook.
     Allows for collapsible interactive interaction with data.
 
     Args:

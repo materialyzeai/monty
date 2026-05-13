@@ -1,6 +1,4 @@
-"""
-Useful additional string functions.
-"""
+"""Useful additional string functions."""
 
 from __future__ import annotations
 
@@ -12,8 +10,7 @@ if TYPE_CHECKING:
 
 
 def remove_non_ascii(s: str) -> str:
-    """
-    Remove non-ascii characters in a file. Needed when support for non-ASCII
+    """Remove non-ascii characters in a file. Needed when support for non-ASCII
     is not available.
 
     Args:
@@ -36,8 +33,7 @@ def is_string(s: Any) -> bool:
 
 
 def list_strings(arg: str | Iterable[str]) -> list[str]:
-    """
-    Always return a list of strings, given a string or list of strings as
+    """Always return a list of strings, given a string or list of strings as
     input.
 
     Examples:
@@ -63,8 +59,7 @@ def list_strings(arg: str | Iterable[str]) -> list[str]:
 
 
 def marquee(text: str = "", width: int = 78, mark: str = "*") -> str:
-    """
-    Return the input string centered in a 'marquee'.
+    """Return the input string centered in a 'marquee'.
 
     Args:
         text (str): Input string
@@ -92,8 +87,7 @@ def marquee(text: str = "", width: int = 78, mark: str = "*") -> str:
 
 
 def boxed(msg: str, ch: str = "=", pad: int = 5) -> str:
-    """
-    Returns a string in a box
+    """Returns a string in a box.
 
     Args:
         msg: Input string.
@@ -119,8 +113,7 @@ def boxed(msg: str, ch: str = "=", pad: int = 5) -> str:
 
 
 def make_banner(s: str, width: int = 78, mark: str = "*") -> str:
-    """
-    Args:
+    """Args:
         s: String
         width: Width of banner. Defaults to 78.
         mark: The mark used to create the banner.
@@ -133,9 +126,8 @@ def make_banner(s: str, width: int = 78, mark: str = "*") -> str:
 
 
 def indent(lines: str, amount: int, ch: str = " ") -> str:
-    """
-    Indent the lines in a string by padding each one with proper number of pad
-    characters
+    """Indent the lines in a string by padding each one with proper number of pad
+    characters.
     """
     padding = amount * ch
     return padding + ("\n" + padding).join(lines.split("\n"))

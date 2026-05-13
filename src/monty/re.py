@@ -1,6 +1,4 @@
-"""
-Helpful regex based functions. E.g., grepping.
-"""
+"""Helpful regex based functions. E.g., grepping."""
 
 from __future__ import annotations
 
@@ -22,8 +20,7 @@ def regrep(
     terminate_on_match: bool = False,
     postprocess: Callable = str,
 ) -> dict:
-    r"""
-    A powerful regular expression version of grep.
+    r"""A powerful regular expression version of grep.
 
     Args:
         filename (str): Filename to grep.

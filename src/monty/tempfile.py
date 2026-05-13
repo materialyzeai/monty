@@ -1,6 +1,4 @@
-"""
-Temporary directory and file creation utilities.
-"""
+"""Temporary directory and file creation utilities."""
 
 from __future__ import annotations
 
@@ -20,17 +18,12 @@ if TYPE_CHECKING:
 
 
 class ScratchDir:
-    """
-    Notes:
-        With effect from Python 3.2, tempfile.TemporaryDirectory already
-        implements much of the functionality of ScratchDir. However, it does
-        not provide options for copying of files to and from (though it is
-        possible to do this with other methods provided by shutil).
+    """Context manager that creates and cleans up a temporary working directory.
 
     Creates a "with" context manager that automatically handles creation of
-    temporary directories (utilizing Python's build in temp directory
-    functions) and cleanup when done. This improves on Python's built in
-    functions by allowing for truly temporary workspace that are deleted
+    temporary directories (utilizing Python's built-in temp directory
+    functions) and cleanup when done. This improves on Python's built-in
+    functions by allowing for truly temporary workspaces that are deleted
     when it is done. The way it works is as follows:
 
     1. Create a temp dir in specified root path.
@@ -40,6 +33,12 @@ class ScratchDir:
     5. Optionally copy generated output files back to original directory.
     6. Change back to original directory.
     7. Delete temp dir.
+
+    Note:
+        From Python 3.2 on, ``tempfile.TemporaryDirectory`` implements much
+        of the functionality of ScratchDir. However, it does not provide
+        options for copying of files to and from (though it is possible to
+        do this with other methods provided by shutil).
     """
 
     SCR_LINK: ClassVar[str] = "scratch_link"
@@ -53,11 +52,11 @@ class ScratchDir:
         gzip_on_exit: bool = False,
         delete_removed_files: bool | None = None,
     ) -> None:
-        """
-        Initializes scratch directory given a **root** path. There is no need
-        to try to create unique directory names. The code will generate a
-        temporary sub directory in the rootpath. The way to use this is using a
-        with context manager. Example::
+        """Initialize scratch directory given a **root** path.
+
+        There is no need to try to create unique directory names. The code
+        will generate a temporary sub directory in the rootpath. The way to
+        use this is using a with context manager. Example::
 
             with ScratchDir("/scratch"):
                 do_something()

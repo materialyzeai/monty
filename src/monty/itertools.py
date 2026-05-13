@@ -1,6 +1,4 @@
-"""
-Additional tools for iteration.
-"""
+"""Additional tools for iteration."""
 
 from __future__ import annotations
 
@@ -14,8 +12,7 @@ if TYPE_CHECKING:
 
 
 def chunks(items: Iterable, n: int) -> Iterable:
-    """
-    Yield successive n-sized chunks from a list-like object.
+    """Yield successive n-sized chunks from a list-like object.
 
     >>> import pprint
     >>> pprint.pprint(list(chunks(range(1, 25), 10)))
@@ -31,8 +28,7 @@ def chunks(items: Iterable, n: int) -> Iterable:
 
 
 def iterator_from_slice(s) -> Iterable:
-    """
-    Constructs an iterator given a slice object s.
+    """Constructs an iterator given a slice object s.
 
     Notes:
         The function returns an infinite iterator if s.stop is None
@@ -51,8 +47,7 @@ def iterator_from_slice(s) -> Iterable:
 def iuptri(
     items: Iterable[Iterable], diago: bool = True, with_inds: bool = False
 ) -> Iterable[Iterable]:
-    """
-    A generator that yields the upper triangle of the matrix (items x items)
+    """A generator that yields the upper triangle of the matrix (items x items).
 
     Args:
         items: Iterable object with elements [e0, e1, ...]
@@ -78,8 +73,7 @@ def iuptri(
 def ilotri(
     items: Iterable[Iterable], diago: bool = True, with_inds: bool = False
 ) -> Iterable[Iterable]:
-    """
-    A generator that yields the lower triangle of the matrix (items x items)
+    """A generator that yields the lower triangle of the matrix (items x items).
 
     Args:
         items: Iterable object with elements [e0, e1, ...]

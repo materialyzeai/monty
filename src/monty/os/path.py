@@ -1,6 +1,4 @@
-"""
-Path based methods, e.g., which, zpath, etc.
-"""
+"""Path based methods, e.g., which, zpath, etc."""
 
 from __future__ import annotations
 
@@ -18,8 +16,7 @@ if TYPE_CHECKING:
 
 
 def zpath(filename: PathLike) -> str:
-    """
-    Returns an existing (zipped or unzipped) file path given the unzipped
+    """Returns an existing (zipped or unzipped) file path given the unzipped
     version. If no path exists, returns the filename unmodified.
 
     Args:
@@ -48,10 +45,9 @@ def find_exts(
     include_dirs: str | None = None,
     match_mode: Literal["basename", "abspath"] = "basename",
 ) -> list[str]:
-    """
-    Find all files with the extension listed in `exts` that are located within
+    """Find all files with the extension listed in `exts` that are located within
     the directory tree rooted at `top` (including top itself, but excluding
-    '.' and '..')
+    '.' and '..').
 
     Args:
         top (str): Root directory
