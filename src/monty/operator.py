@@ -9,7 +9,7 @@ import operator
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from typing import Callable
+    from collections.abc import Callable
 
 
 def operator_from_str(op: str) -> Callable:

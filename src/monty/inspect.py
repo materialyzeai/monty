@@ -10,10 +10,10 @@ from inspect import currentframe, getframeinfo
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from typing import Literal, Type
+    from typing import Literal
 
 
-def all_subclasses(cls: Type) -> list[Type]:
+def all_subclasses(cls: type) -> list[type]:
     """
     Given a class `cls`, this recursive function returns a list with
     all subclasses, subclasses of subclasses, and so on.

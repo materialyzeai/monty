@@ -20,7 +20,8 @@ from abc import ABC
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from typing import Any, Iterable
+    from typing import Any
+    from collections.abc import Iterable
 
 
 def tree() -> collections.defaultdict:
@@ -185,7 +186,7 @@ class AttrDict(dict):
     """
 
     def __init__(self, *args, **kwargs) -> None:
-        super(AttrDict, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
         self.__dict__ = self
 
     def __setitem__(self, key, value) -> None:

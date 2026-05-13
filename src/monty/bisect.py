@@ -23,7 +23,7 @@ __email__ = "gmatteo@gmail.com"
 __date__ = "11/09/14"
 
 
-def index(a: list[float], x: float, atol: Optional[float] = None) -> int:
+def index(a: list[float], x: float, atol: float | None = None) -> int:
     """Locate the leftmost value exactly equal to x."""
     i = bs.bisect_left(a, x)
     if i != len(a):

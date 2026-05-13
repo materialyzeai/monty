@@ -519,7 +519,7 @@ def load2dict(file_path) -> dict:
     save_dir = json_path.parent
     pickle_path = save_dir / f"{json_path.stem}.pkl"
 
-    with open(json_path, "r", encoding="utf-8") as infile:
+    with open(json_path, encoding="utf-8") as infile:
         d = json.loads(infile.read())
 
     if pickle_path.exists():

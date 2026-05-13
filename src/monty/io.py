@@ -19,7 +19,8 @@ from pathlib import Path
 from typing import IO, TYPE_CHECKING, Any, Literal, cast, overload
 
 if TYPE_CHECKING:
-    from typing import Iterator, TypeAlias
+    from typing import TypeAlias
+    from collections.abc import Iterator
 
     from monty.shutil import PathLike
 

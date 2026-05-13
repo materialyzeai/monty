@@ -15,7 +15,7 @@ from monty.string import is_string
 if TYPE_CHECKING:
     from typing import Optional
 
-    from typing_extensions import Self
+    from typing import Self
 
 __author__ = "Matteo Giantomass"
 __copyright__ = "Copyright 2014, The Materials Virtual Lab"
@@ -63,7 +63,7 @@ class Command:
     def __str__(self):
         return f"command: {self.command}, retcode: {self.retcode}"
 
-    def run(self, timeout: Optional[float] = None, **kwargs) -> Self:
+    def run(self, timeout: float | None = None, **kwargs) -> Self:
         """
         Run a command in a separated thread and wait timeout seconds.
         kwargs are keyword arguments passed to Popen.

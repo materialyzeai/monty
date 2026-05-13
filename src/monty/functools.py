@@ -13,7 +13,8 @@ from functools import partial, wraps
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from typing import Any, Callable, Union
+    from typing import Any, Union
+    from collections.abc import Callable
 
 
 class _HashedSeq(list):  # pylint: disable=C0205
@@ -130,7 +131,7 @@ class lazy_property:
 
 
 def return_if_raise(
-    exception_tuple: Union[list, tuple], retval_if_exc: Any, disabled: bool = False
+    exception_tuple: list | tuple, retval_if_exc: Any, disabled: bool = False
 ) -> Any:
     """
     Decorator for functions, methods or properties. Execute the callable in a

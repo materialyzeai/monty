@@ -7,7 +7,8 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, cast
 
 if TYPE_CHECKING:
-    from typing import Any, Iterable, Union
+    from typing import Any, Union
+    from collections.abc import Iterable
 
 
 def remove_non_ascii(s: str) -> str:
@@ -34,7 +35,7 @@ def is_string(s: Any) -> bool:
         return False
 
 
-def list_strings(arg: Union[str, Iterable[str]]) -> list[str]:
+def list_strings(arg: str | Iterable[str]) -> list[str]:
     """
     Always return a list of strings, given a string or list of strings as
     input.

@@ -8,7 +8,7 @@ from multiprocessing import Pool
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from typing import Callable, Iterable
+    from collections.abc import Callable, Iterable
 
 try:
     from tqdm.autonotebook import tqdm

@@ -12,7 +12,7 @@ from typing import TYPE_CHECKING
 from monty.io import reverse_readfile, zopen
 
 if TYPE_CHECKING:
-    from typing import Callable
+    from collections.abc import Callable
 
 
 def regrep(

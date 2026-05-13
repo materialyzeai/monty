@@ -11,7 +11,8 @@ from monty.fnmatch import WildCard
 from monty.string import list_strings
 
 if TYPE_CHECKING:
-    from typing import Callable, Literal, Optional, Union
+    from typing import Literal, Optional, Union
+    from collections.abc import Callable
 
     from monty.shutil import PathLike
 
@@ -42,9 +43,9 @@ def zpath(filename: PathLike) -> str:
 
 def find_exts(
     top: str,
-    exts: Union[str, list[str]],
-    exclude_dirs: Optional[str] = None,
-    include_dirs: Optional[str] = None,
+    exts: str | list[str],
+    exclude_dirs: str | None = None,
+    include_dirs: str | None = None,
     match_mode: Literal["basename", "abspath"] = "basename",
 ) -> list[str]:
     """

@@ -14,14 +14,14 @@ from datetime import datetime
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from typing import Callable, Optional, Type
+    from collections.abc import Callable
 
 
 def deprecated(
-    replacement: Optional[Callable | str] = None,
+    replacement: Callable | str | None = None,
     message: str = "",
-    deadline: Optional[tuple[int, int, int]] = None,
-    category: Type[Warning] = FutureWarning,
+    deadline: tuple[int, int, int] | None = None,
+    category: type[Warning] = FutureWarning,
 ) -> Callable:
     """
     Decorator to mark classes or functions as deprecated, with a possible replacement.
@@ -86,7 +86,7 @@ def deprecated(
 
         return wrapped
 
-    def deprecated_class_decorator(cls: Type) -> Type:
+    def deprecated_class_decorator(cls: type) -> type:
         # Modify __post_init__ for dataclass
         if is_dataclass(cls) and hasattr(cls, "__post_init__"):
             original_init = cls.__post_init__
