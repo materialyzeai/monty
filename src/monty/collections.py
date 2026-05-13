@@ -19,8 +19,8 @@ from abc import ABC
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from typing import Any
     from collections.abc import Iterable
+    from typing import Any
 
 
 def tree() -> collections.defaultdict:

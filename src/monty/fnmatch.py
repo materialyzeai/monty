@@ -33,16 +33,17 @@ class WildCard:
         return f"<{self.__class__.__name__}, patterns = {self.pats}>"
 
     def filter(self, names: list[str]) -> list[str]:
-        """Returns a list with the names matching the pattern."""
-        names = list_strings(names)
+        """Return a list with the names matching the pattern.
 
-        filenames = []
-        for filename in names:
-            for pat in self.pats:
-                if fnmatch.fnmatch(filename, pat):
-                    filenames.append(filename)
-
-        return filenames
+        Note: a name that matches multiple patterns is repeated once per
+        match in the result (preserved for backward compatibility).
+        """
+        return [
+            filename
+            for filename in list_strings(names)
+            for pat in self.pats
+            if fnmatch.fnmatch(filename, pat)
+        ]
 
     def match(self, name: str) -> bool:
         """Returns True if name matches one of the patterns."""

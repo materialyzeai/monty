@@ -425,35 +425,31 @@ class TestMSONable:
             "Hello",
             "World",
             "Python",
-            **{
-                "cant_serialize_me": GoodNOTMSONClass(
-                    "Hello2", "World2", "Python2", **{"values": []}
-                ),
-                "cant_serialize_me2": [
-                    GoodNOTMSONClass("Hello4", "World4", "Python4", **{"values": []}),
-                    GoodNOTMSONClass("Hello4", "World4", "Python4", **{"values": []}),
-                ],
-                "cant_serialize_me3": [
-                    {
-                        "tmp": GoodMSONClass(
-                            "Hello5", "World5", "Python5", **{"values": []}
-                        ),
-                        "tmp2": 2,
-                        "tmp3": [1, 2, 3],
-                    },
-                    {
-                        "tmp5": GoodNOTMSONClass(
-                            "aHello5", "aWorld5", "aPython5", **{"values": []}
-                        ),
-                        "tmp2": 5,
-                        "tmp3": {"test": "test123"},
-                    },
-                    # Gotta check that if I hide an MSONable class somewhere
-                    # it still gets correctly serialized.
-                    {"actually_good": GoodMSONClass("1", "2", "3", **{"values": []})},
-                ],
-                "values": [],
-            },
+            cant_serialize_me=GoodNOTMSONClass(
+                "Hello2", "World2", "Python2", values=[]
+            ),
+            cant_serialize_me2=[
+                GoodNOTMSONClass("Hello4", "World4", "Python4", values=[]),
+                GoodNOTMSONClass("Hello4", "World4", "Python4", values=[]),
+            ],
+            cant_serialize_me3=[
+                {
+                    "tmp": GoodMSONClass("Hello5", "World5", "Python5", values=[]),
+                    "tmp2": 2,
+                    "tmp3": [1, 2, 3],
+                },
+                {
+                    "tmp5": GoodNOTMSONClass(
+                        "aHello5", "aWorld5", "aPython5", values=[]
+                    ),
+                    "tmp2": 5,
+                    "tmp3": {"test": "test123"},
+                },
+                # Gotta check that if I hide an MSONable class somewhere
+                # it still gets correctly serialized.
+                {"actually_good": GoodMSONClass("1", "2", "3", values=[])},
+            ],
+            values=[],
         )
 
         # This will pass
@@ -605,7 +601,7 @@ class TestJson:
         jsanitize(dt, strict=True)
 
         # test timezone aware datetime API
-        created_at = datetime.datetime.now(tz=datetime.timezone.utc)
+        created_at = datetime.datetime.now(tz=datetime.UTC)
         data = json.loads(json.dumps(created_at, cls=MontyEncoder))
 
         created_at_after = MontyDecoder().process_decoded(data)
@@ -1157,7 +1153,7 @@ class TestJson:
             a: LimitedMSONClass
 
         class ModelWithUnion(BaseModel):
-            a: Union[LimitedMSONClass, dict]
+            a: LimitedMSONClass | dict
 
         limited_dict = jsanitize(ModelWithLimited(a=LimitedMSONClass(1)), strict=True)
         assert ModelWithLimited.model_validate(limited_dict)
@@ -1223,7 +1219,7 @@ class TestJson:
         assert "@object_reference" in not_m_d
         assert len(not_m_map) == 1
         mixed = {"is_m": is_m, "not_m": not_m}
-        mixed_jsons, mixed_map = partial_monty_encode(mixed, {"indent": 2})
+        mixed_jsons, _mixed_map = partial_monty_encode(mixed, {"indent": 2})
         mixed_d = json.loads(mixed_jsons)
         assert mixed_d["is_m"]["a"] == 1
         assert mixed_d["is_m"]["@class"] == "GoodMSONClass"
@@ -1374,7 +1370,7 @@ class TestCheckType:
     @pytest.mark.skipif(json_util is None, reason="pymongo not present")
     def test_extended_json(self):
         ext_json_dict = {
-            "datetime": datetime.datetime.now(datetime.timezone.utc),
+            "datetime": datetime.datetime.now(datetime.UTC),
             "NaN": float("NaN"),
             "infinity": float("inf"),
             "-infinity": -float("inf"),

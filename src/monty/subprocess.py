@@ -11,9 +11,7 @@ from typing import TYPE_CHECKING
 from monty.string import is_string
 
 if TYPE_CHECKING:
-    from typing import Optional
-
-    from typing import Self
+    from typing import Optional, Self
 
 __author__ = "Matteo Giantomass"
 __copyright__ = "Copyright 2014, The Materials Virtual Lab"

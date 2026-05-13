@@ -260,7 +260,7 @@ class MSONable:
         )
         ordered_keys = [item for item in ordered_keys if "@" not in item[0]]
         # sha1 is used here as a fingerprint, not for cryptographic security.
-        return sha1(  # noqa: S324
+        return sha1(
             json.dumps(OrderedDict(ordered_keys)).encode("utf-8"),
             usedforsecurity=False,
         )

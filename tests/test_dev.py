@@ -25,7 +25,6 @@ class TestDeprecated:
         @deprecated(func_replace, "Use func_replace instead", deadline=(2025, 1, 1))
         def func_old():
             """This is the old function."""
-            pass
 
         with warnings.catch_warnings(record=True) as w:
             # Trigger a warning.
@@ -129,7 +128,6 @@ class TestDeprecated:
 
             def method_b(self):
                 """This is method_b."""
-                pass
 
         with pytest.warns(FutureWarning, match="TestClassOld is deprecated"):
             old_class = TestClassOld()
@@ -164,7 +162,6 @@ class TestDeprecated:
 
             def method_b(self):
                 """This is method_b."""
-                pass
 
         with pytest.warns(FutureWarning, match="TestClassOld is deprecated"):
             old_class = TestClassOld()

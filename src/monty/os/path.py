@@ -9,8 +9,8 @@ from monty.fnmatch import WildCard
 from monty.string import list_strings
 
 if TYPE_CHECKING:
-    from typing import Literal, Optional, Union
     from collections.abc import Callable
+    from typing import Literal, Optional, Union
 
     from monty.shutil import PathLike
 

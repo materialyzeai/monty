@@ -119,8 +119,6 @@ def compress_dir(path: PathLike, compression: Literal["gz", "bz2"] = "gz") -> No
         for f in files:
             compress_file(Path(parent, f), compression=compression)
 
-    return
-
 
 def decompress_file(
     filepath: PathLike, target_dir: PathLike | None = None

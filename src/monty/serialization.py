@@ -21,7 +21,7 @@ except ImportError:
 
 if TYPE_CHECKING:
     from pathlib import Path
-    from typing import Any, Literal, TextIO
+    from typing import Any
 
     from monty.shutil import PathLike
 

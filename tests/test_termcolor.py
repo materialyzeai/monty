@@ -15,7 +15,7 @@ from monty.termcolor import (
 class TestFunc:
     def test_remove_non_ascii(self):
         enable(True)
-        print("Current terminal type: %s" % os.getenv("TERM"))
+        print("Current terminal type: {}".format(os.getenv("TERM")))
         print("Test basic colors:")
         cprint("Grey color", "grey")
         cprint("Red color", "red")

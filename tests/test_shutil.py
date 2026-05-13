@@ -164,7 +164,7 @@ class TestGzipDir:
             gzip_dir(os.path.join(TEST_DIR, "gzip_dir"))
 
         # Verify contents of the files
-        with open(full_f, "r", encoding="utf-8") as f:
+        with open(full_f, encoding="utf-8") as f:
             assert f.read() == "not gzipped"
 
         with GzipFile(gz_f, "rb") as g:

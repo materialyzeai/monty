@@ -11,8 +11,8 @@ from functools import partial, wraps
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from typing import Any, Union
     from collections.abc import Callable
+    from typing import Any, Union
 
 
 class _HashedSeq(list):
@@ -217,7 +217,7 @@ class timeout:
         signal.signal(signal.SIGALRM, self.handle_timeout)
         signal.alarm(self.seconds)
 
-    def __exit__(self, type: Any, value: Any, traceback: Any) -> None:  # noqa: A002
+    def __exit__(self, type: Any, value: Any, traceback: Any) -> None:
         signal.alarm(0)
 
 

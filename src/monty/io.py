@@ -14,7 +14,7 @@ import os
 import subprocess
 import time
 import warnings
-from builtins import EncodingWarning as EncodingWarning  # noqa: PLC0414
+from builtins import EncodingWarning as EncodingWarning
 from pathlib import Path
 from typing import IO, TYPE_CHECKING, Any, Literal, cast, overload
 

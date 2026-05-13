@@ -44,7 +44,7 @@ class TestGetLineEnding:
             assert _get_line_ending(Path(test_file)) == l_end
 
             # Test text mode
-            with open(test_file, "r", encoding="utf-8") as f:
+            with open(test_file, encoding="utf-8") as f:
                 start_pos = f.tell()
                 assert _get_line_ending(f) == l_end
                 assert f.tell() == start_pos
@@ -142,12 +142,12 @@ class TestReverseReadline:
         ) as f:
             for idx, line in enumerate(reverse_readline(f)):
                 assert isinstance(line, str)
-                assert line == f"{str(self.NUMLINES - idx)}{os.linesep}"
+                assert line == f"{self.NUMLINES - idx!s}{os.linesep}"
 
         # Test binary mode
         with open(os.path.join(TEST_DIR, "3000_lines.txt"), mode="rb") as f:
             for idx, line in enumerate(reverse_readline(f)):
-                assert line == f"{str(self.NUMLINES - idx)}{os.linesep}"
+                assert line == f"{self.NUMLINES - idx!s}{os.linesep}"
 
     @pytest.mark.parametrize("l_end", ["\n", "\r\n"])
     def test_big_file(self, l_end):
@@ -169,14 +169,14 @@ class TestReverseReadline:
             assert os.path.getsize(file_name) > 1_000_000  # 1 MB
 
             # Test text mode
-            with open(file_name, mode="r", encoding="utf-8", newline="") as file:
+            with open(file_name, encoding="utf-8", newline="") as file:
                 for idx, line in enumerate(reverse_readline(file, max_mem=4096)):
-                    assert line == f"{str(num_lines - idx)}{l_end}"
+                    assert line == f"{num_lines - idx!s}{l_end}"
 
             # Test binary mode
             with open(file_name, mode="rb") as file:
                 for idx, line in enumerate(reverse_readline(file, max_mem=4096)):
-                    assert line == f"{str(num_lines - idx)}{l_end}"
+                    assert line == f"{num_lines - idx!s}{l_end}"
 
     def test_read_bz2(self):
         """
@@ -217,7 +217,7 @@ class TestReverseReadline:
                 for line in contents:
                     file.write(line.encode())
 
-            with open(filename, mode="r", newline="") as file:
+            with open(filename, newline="") as file:
                 revert_contents = tuple(reverse_readline(file, max_mem=ram))
             assert revert_contents[::-1] == contents
 
@@ -258,7 +258,7 @@ class TestReverseReadline:
                     file.write(line.encode())
 
             # Test text mode
-            with open(file_name, "r", encoding="utf-8") as file:
+            with open(file_name, encoding="utf-8") as file:
                 for idx, line in enumerate(reverse_readline(file, max_mem=ram)):
                     # OS would automatically change line ending in text mode
                     assert (
@@ -290,7 +290,7 @@ class TestReverseReadfile:
         for idx, line in enumerate(reverse_readfile(fname)):
             assert isinstance(line, str)
             # OS would automatically convert line ending in text mode
-            assert line == f"{str(self.NUM_LINES - idx)}{os.linesep}"
+            assert line == f"{self.NUM_LINES - idx!s}{os.linesep}"
 
     def test_read_gz(self):
         """
@@ -300,7 +300,7 @@ class TestReverseReadfile:
         fname = os.path.join(TEST_DIR, "3000_lines.txt.gz")
         for idx, line in enumerate(reverse_readfile(fname)):
             assert isinstance(line, str)
-            assert line == f"{str(self.NUM_LINES - idx)}\n"
+            assert line == f"{self.NUM_LINES - idx!s}\n"
 
     def test_read_bz2(self):
         """
@@ -310,7 +310,7 @@ class TestReverseReadfile:
         fname = os.path.join(TEST_DIR, "3000_lines.txt.bz2")
         for idx, line in enumerate(reverse_readfile(fname)):
             assert isinstance(line, str)
-            assert line == f"{str(self.NUM_LINES - idx)}\n"
+            assert line == f"{self.NUM_LINES - idx!s}\n"
 
     def test_read_empty_file(self):
         """
