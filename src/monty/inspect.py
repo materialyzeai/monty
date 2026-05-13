@@ -22,12 +22,12 @@ def all_subclasses(cls: type) -> list[type]:
 def find_top_pyfile() -> str:
     """This function inspects the Cpython frame to find the path of the script."""
     frame = currentframe()
-    while True:
-        if frame.f_back is None:
-            finfo = getframeinfo(frame)
-            return os.path.abspath(finfo.filename)
-
+    if frame is None:
+        raise RuntimeError("Could not obtain current frame.")
+    while frame.f_back is not None:
         frame = frame.f_back
+    finfo = getframeinfo(frame)
+    return os.path.abspath(finfo.filename)
 
 
 def caller_name(skip: Literal[1, 2] = 2) -> str:

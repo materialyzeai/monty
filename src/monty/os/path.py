@@ -94,7 +94,7 @@ def find_exts(
     mangle: Callable[..., str] = mangle_functions[match_mode]
 
     # Assume directory
-    paths = []
+    paths: list[str] = []
     for dirpath, _dirnames, filenames in os.walk(top):
         dirpath = os.path.abspath(dirpath)
 

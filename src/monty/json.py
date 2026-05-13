@@ -798,7 +798,7 @@ class MontyDecoder(json.JSONDecoder):
                             and dataclasses.is_dataclass(cls_)
                         ):
                             d = {k: self.process_decoded(v) for k, v in data.items()}
-                            return cls_(**d)
+                            return cls_(**d)  # type: ignore[operator]
 
                 elif modname == "torch" and classname == "Tensor":
                     try:
@@ -868,7 +868,7 @@ class MontyDecoder(json.JSONDecoder):
 
         return d
 
-    def decode(self, s: str) -> Any:
+    def decode(self, s: str) -> Any:  # type: ignore[override]
         """Override decode from JSONDecoder.
 
         Args:

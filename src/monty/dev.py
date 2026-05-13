@@ -89,7 +89,7 @@ def deprecated(
         if is_dataclass(cls) and hasattr(cls, "__post_init__"):
             original_init = cls.__post_init__
         else:
-            original_init = cls.__init__
+            original_init = cls.__init__  # type: ignore[misc]
 
         @functools.wraps(original_init)
         def new_init(self, *args, **kwargs):
@@ -100,7 +100,7 @@ def deprecated(
         if is_dataclass(cls) and hasattr(cls, "__post_init__"):
             cls.__post_init__ = new_init
         else:
-            cls.__init__ = new_init
+            cls.__init__ = new_init  # type: ignore[misc]
 
         return cls
 
