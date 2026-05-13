@@ -34,9 +34,9 @@ def _identify_format(file_name: str | Path) -> _FILE_TYPE:
     basename = os.path.basename(file_name).lower()
     if ".mpk" in basename:
         return "mpk"
-    elif any(ext in basename for ext in (".yaml", ".yml")):
+    if any(ext in basename for ext in (".yaml", ".yml")):
         return "yaml"
-    elif "jsonl" in basename:
+    if "jsonl" in basename:
         return "jsonl"
     return "json"
 

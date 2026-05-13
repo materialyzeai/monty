@@ -99,7 +99,7 @@ def compress_file(
             compressed_file: PathLike = target_dir / f"{filepath.name}.{compression}"
 
         else:
-            compressed_file = f"{str(filepath)}.{compression}"
+            compressed_file = f"{filepath!s}.{compression}"
 
         with open(filepath, "rb") as f_in, zopen(compressed_file, mode="wb") as f_out:
             f_out.writelines(f_in)

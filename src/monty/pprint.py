@@ -35,10 +35,8 @@ def pprint_table(
         for row_idx, row in enumerate(table):
             table[row_idx] = [c.rstrip() for c in row]
 
-    col_paddings = []
     ncols = len(table[0])
-    for i in range(ncols):
-        col_paddings.append(max_width_col(table, i))
+    col_paddings = [max_width_col(table, i) for i in range(ncols)]
 
     for row in table:
         # left col

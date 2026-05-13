@@ -112,12 +112,11 @@ def deprecated(
     def decorator(target: Callable) -> Callable:
         if inspect.isfunction(target):
             return deprecated_function_decorator(target)
-        elif inspect.isclass(target):
+        if inspect.isclass(target):
             return deprecated_class_decorator(target)
-        else:
-            raise TypeError(
-                "The @deprecated decorator can only be applied to classes or functions"
-            )
+        raise TypeError(
+            "The @deprecated decorator can only be applied to classes or functions"
+        )
 
     return decorator
 
@@ -188,10 +187,10 @@ def install_excepthook(hook_type: str = "color", **kwargs) -> int:
         raise ImportError("Cannot install excepthook, IPython not installed") from exc
 
     # Select the hook.
-    hook = dict(
-        color=ultratb.ColorTB,
-        verbose=ultratb.VerboseTB,
-    ).get(hook_type.lower(), None)
+    hook = {
+        "color": ultratb.ColorTB,
+        "verbose": ultratb.VerboseTB,
+    }.get(hook_type.lower())
 
     if hook is None:
         return 2

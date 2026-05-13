@@ -537,7 +537,7 @@ def _recursive_name_object_map_replacement(d, name_object_map):
             k: _recursive_name_object_map_replacement(v, name_object_map)
             for k, v in d.items()
         }
-    elif isinstance(d, list):
+    if isinstance(d, list):
         return [_recursive_name_object_map_replacement(x, name_object_map) for x in d]
     return d
 
@@ -560,7 +560,7 @@ class MontyEncoder(json.JSONEncoder):
         self._index: int = 0
 
     def _update_name_object_map(self, o):
-        name = f"{self._index:012}-{str(uuid4())}"
+        name = f"{self._index:012}-{uuid4()!s}"
         self._index += 1
         self._name_object_map[name] = o
         return {"@object_reference": name}
@@ -781,10 +781,10 @@ class MontyDecoder(json.JSONDecoder):
                             )
                         return dt
 
-                    elif modname == "uuid" and classname == "UUID":
+                    if modname == "uuid" and classname == "UUID":
                         return UUID(d["string"])
 
-                    elif modname == "pathlib" and classname == "Path":
+                    if modname == "pathlib" and classname == "Path":
                         return Path(d["string"])
 
                     mod = __import__(modname, globals(), locals(), [classname], 0)
@@ -826,15 +826,14 @@ class MontyDecoder(json.JSONDecoder):
                             return torch.tensor(
                                 [
                                     np.array(r) + np.array(i) * 1j
-                                    for r, i in zip(*d["data"])
+                                    for r, i in zip(*d["data"], strict=True)
                                 ],
                             ).type(d["dtype"])
 
-                        else:
-                            if "size" in d and d["data"] == []:
-                                return torch.empty(d["size"]).type(d["dtype"])
+                        if "size" in d and d["data"] == []:
+                            return torch.empty(d["size"]).type(d["dtype"])
 
-                            return torch.tensor(d["data"]).type(d["dtype"])
+                        return torch.tensor(d["data"]).type(d["dtype"])
 
                     except ImportError:
                         pass
@@ -844,7 +843,7 @@ class MontyDecoder(json.JSONDecoder):
                         return np.array(
                             [
                                 np.array(r) + np.array(i) * 1j
-                                for r, i in zip(*d["data"])
+                                for r, i in zip(*d["data"], strict=True)
                             ],
                             dtype=d["dtype"],
                         )
@@ -942,7 +941,7 @@ def jsanitize(
     if isinstance(obj, Enum):
         if enum_values:
             return obj.value
-        elif hasattr(obj, "as_dict"):
+        if hasattr(obj, "as_dict"):
             return obj.as_dict()
         return MontyEncoder().default(obj)
 

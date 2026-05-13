@@ -4,6 +4,7 @@ Temporary directory and file creation utilities.
 
 from __future__ import annotations
 
+import contextlib
 import os
 import shutil
 import tempfile
@@ -147,11 +148,9 @@ class ScratchDir:
                 ) -> dict[str, float]:
                     out: dict[str, float] = {}
                     for rel in rel_paths:
-                        try:
+                        # File may have been removed between listing and stat
+                        with contextlib.suppress(FileNotFoundError):
                             out[rel] = os.path.getmtime(os.path.join(root, rel))
-                        except FileNotFoundError:
-                            # File may have been removed between listing and stat
-                            pass
                     return out
 
                 common_paths = get_files(self.tempdir) & get_files(self.cwd)

@@ -107,8 +107,10 @@ def find_exts(
         if include_dirs and not _include_dirs.match(mangle(dirpath)):
             continue
 
-        for filename in filenames:
-            if any(filename.endswith(ext) for ext in exts):
-                paths.append(os.path.join(dirpath, filename))
+        paths.extend(
+            os.path.join(dirpath, filename)
+            for filename in filenames
+            if any(filename.endswith(ext) for ext in exts)
+        )
 
     return paths

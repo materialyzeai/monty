@@ -83,7 +83,7 @@ class ControlledDict(collections.UserDict, ABC):
         """Forbid adding or updating keys based on _allow_add and _allow_update."""
         if key not in self.data and not self._allow_add:
             raise TypeError(f"Cannot add new key {key!r}, because add is disabled.")
-        elif key in self.data and not self._allow_update:
+        if key in self.data and not self._allow_update:
             raise TypeError(f"Cannot update key {key!r}, because update is disabled.")
 
         super().__setitem__(key, value)
@@ -97,7 +97,7 @@ class ControlledDict(collections.UserDict, ABC):
                 raise TypeError(
                     f"Cannot add new key {key!r} using update, because add is disabled."
                 )
-            elif key in self.data and not self._allow_update:
+            if key in self.data and not self._allow_update:
                 raise TypeError(
                     f"Cannot update key {key!r} using update, because update is disabled."
                 )

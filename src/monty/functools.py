@@ -279,7 +279,7 @@ def prof_main(main):
             sys.exit(main())
         else:
             print("Entering profiling mode...")
-            prof_file = kwargs.get("prof_file", None)
+            prof_file = kwargs.get("prof_file")
             if prof_file is None:
                 _, prof_file = tempfile.mkstemp()
                 print(f"Profiling data stored in {prof_file}")

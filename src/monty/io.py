@@ -81,7 +81,7 @@ def zopen(
 
     # Warn against default `encoding` in text mode if
     # `PYTHONWARNDEFAULTENCODING` environment variable is set (PEP 597)
-    if "t" in mode and kwargs.get("encoding", None) is None:
+    if "t" in mode and kwargs.get("encoding") is None:
         if os.getenv("PYTHONWARNDEFAULTENCODING", False):
             warnings.warn(
                 "We strongly encourage explicit `encoding`, "
@@ -167,7 +167,7 @@ def _get_line_ending(
         return "\n"
 
     # It's likely the line is missing a line ending for the first line
-    raise ValueError(f"Unknown line ending in line {repr(first_line)}.")
+    raise ValueError(f"Unknown line ending in line {first_line!r}.")
 
 
 def reverse_readfile(
