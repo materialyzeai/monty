@@ -98,7 +98,10 @@ def stream_has_colours(stream: object) -> bool:
 
 
 def colored(
-    text: str, color: str = "", on_color: str = "", attrs: list[str] = []
+    text: str,
+    color: str = "",
+    on_color: str = "",
+    attrs: list[str] | None = None,
 ) -> str:
     """Colorize text.
 
@@ -132,7 +135,11 @@ def colored(
 
 
 def cprint(
-    text: str, color: str = "", on_color: str = "", attrs: list[str] = [], **kwargs
+    text: str,
+    color: str = "",
+    on_color: str = "",
+    attrs: list[str] | None = None,
+    **kwargs,
 ) -> None:
     """Print colorize text.
 

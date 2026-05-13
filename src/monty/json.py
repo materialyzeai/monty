@@ -183,7 +183,7 @@ class MSONable:
                 except AttributeError:
                     try:
                         a = getattr(self, "_" + c)
-                    except AttributeError:
+                    except AttributeError as exc:
                         raise NotImplementedError(
                             "Unable to automatically determine as_dict "
                             "format from class. MSONAble requires all "
@@ -192,7 +192,7 @@ class MSONable:
                             "a self.kwargs variable to automatically "
                             "determine the dict format. Alternatively, "
                             "you can implement both as_dict and from_dict."
-                        )
+                        ) from exc
                 d[c] = recursive_as_dict(a)
         if hasattr(self, "kwargs"):
             d.update(**self.kwargs)
@@ -255,7 +255,11 @@ class MSONable:
             flatten(jsanitize(self.as_dict())).items(), key=lambda x: x[0]
         )
         ordered_keys = [item for item in ordered_keys if "@" not in item[0]]
-        return sha1(json.dumps(OrderedDict(ordered_keys)).encode("utf-8"))
+        # sha1 is used here as a fingerprint, not for cryptographic security.
+        return sha1(  # noqa: S324
+            json.dumps(OrderedDict(ordered_keys)).encode("utf-8"),
+            usedforsecurity=False,
+        )
 
     @classmethod
     def _validate_monty(cls, __input_value):
@@ -270,11 +274,11 @@ class MSONable:
                 if isinstance(new_obj, cls):
                     return new_obj
                 return cls(**__input_value)
-            except Exception:
+            except Exception as exc:
                 raise ValueError(
                     f"Error while deserializing {cls.__name__} "
                     f"object: {traceback.format_exc()}"
-                )
+                ) from exc
 
         raise ValueError(
             f"Must provide {cls.__name__}, the as_dict form, or the proper"
@@ -503,7 +507,8 @@ def load2dict(file_path) -> dict:
         d = json.loads(infile.read())
 
     if pickle_path.exists():
-        name_object_map = pickle.load(open(pickle_path, "rb"))
+        with open(pickle_path, "rb") as pkl_file:
+            name_object_map = pickle.load(pkl_file)
         d = _recursive_name_object_map_replacement(d, name_object_map)
     return d
 
@@ -640,7 +645,7 @@ class MontyEncoder(json.JSONEncoder):
                 # Some callables may not have instance __name__
                 if self._allow_unserializable_objects:
                     return self._update_name_object_map(o)
-                raise AttributeError(e)
+                raise AttributeError(e) from e
 
         try:
             if _check_type(o, "pydantic.main.BaseModel"):
@@ -1027,10 +1032,10 @@ def jsanitize(
             enum_values=enum_values,
             recursive_msonable=recursive_msonable,
         )
-    except Exception as exc_:
+    except Exception:
         if strict == "skip":
             return obj
-        raise exc_
+        raise
 
 
 def _serialize_callable(o):
@@ -1047,10 +1052,10 @@ def _serialize_callable(o):
     if bound is not None:
         try:
             bound = MontyEncoder().default(bound)
-        except TypeError:
+        except TypeError as exc:
             raise TypeError(
                 "Only bound methods of classes or MSONable instances are supported."
-            )
+            ) from exc
 
     return {
         "@module": o.__module__,

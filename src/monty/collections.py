@@ -272,7 +272,7 @@ class MongoDict:
                     a = self.__class__(a)
                 return a
             except Exception as exc:
-                raise AttributeError(str(exc))
+                raise AttributeError(str(exc)) from exc
 
     def __getitem__(self, slice_) -> Any:
         return self._mongo_dict_.__getitem__(slice_)

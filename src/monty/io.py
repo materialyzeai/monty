@@ -14,18 +14,19 @@ import os
 import subprocess
 import time
 import warnings
+from builtins import EncodingWarning as EncodingWarning  # noqa: PLC0414
 from pathlib import Path
 from typing import IO, TYPE_CHECKING, Any, Literal, cast, overload
 
 if TYPE_CHECKING:
-    from typing import TypeAlias
     from collections.abc import Iterator
+    from typing import TypeAlias
 
     from monty.shutil import PathLike
 
 
-class EncodingWarning(Warning): ...  # Added in Python 3.10
-
+# `EncodingWarning` (Python 3.10+) is re-exported above so users can keep
+# using ``from monty.io import EncodingWarning``.
 
 # fmt: off
 TextModes: TypeAlias = Literal[
@@ -80,7 +81,7 @@ def zopen(
     # Warn against default `encoding` in text mode if
     # `PYTHONWARNDEFAULTENCODING` environment variable is set (PEP 597)
     if "t" in mode and kwargs.get("encoding") is None:
-        if os.getenv("PYTHONWARNDEFAULTENCODING", False):
+        if os.getenv("PYTHONWARNDEFAULTENCODING"):
             warnings.warn(
                 "We strongly encourage explicit `encoding`, "
                 "and we would use UTF-8 by default as per PEP 686",
@@ -403,7 +404,9 @@ class FileLock:
                 if exc.errno != errno.EEXIST:
                     raise
                 if (time.time() - start_time) >= self.timeout:
-                    raise FileLockException(f"{self.lockfile}: Timeout occurred.")
+                    raise FileLockException(
+                        f"{self.lockfile}: Timeout occurred."
+                    ) from exc
                 time.sleep(self.delay)
 
         self.is_locked = True
