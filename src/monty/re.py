@@ -45,9 +45,7 @@ def regrep(
     matches: dict[str, list] = collections.defaultdict(list)
     # ``pending`` lets ``terminate_on_match`` short-circuit in O(1) per line
     # instead of re-scanning every key in ``compiled``.
-    pending: set[str] | None = (
-        {k for k, _ in compiled} if terminate_on_match else None
-    )
+    pending: set[str] | None = {k for k, _ in compiled} if terminate_on_match else None
     gen = (
         reverse_readfile(filename)
         if reverse
