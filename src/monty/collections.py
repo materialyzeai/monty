@@ -23,6 +23,12 @@ if TYPE_CHECKING:
     from typing import Any
 
 
+# Cache the set of names exposed by ``dict`` once, so AttrDict.__setitem__
+# does not have to call ``dir(dict)`` (which builds a fresh ~50-entry list)
+# on every assignment.
+_DICT_METHOD_NAMES: frozenset[str] = frozenset(dir(dict))
+
+
 def tree() -> collections.defaultdict:
     """A tree object, which is effectively a recursive defaultdict that
     adds tree as members.
@@ -37,8 +43,13 @@ def tree() -> collections.defaultdict:
     return collections.defaultdict(tree)
 
 
-class ControlledDict(collections.UserDict, ABC):
+class ControlledDict(dict, ABC):
     """A base dictionary class with configurable mutability.
+
+    Subclasses ``dict`` directly (rather than ``collections.UserDict``) so the
+    common read paths run at C speed; mutation methods are overridden in pure
+    Python to enforce the ``_allow_*`` flags. ``dict.__init__`` bypasses
+    ``__setitem__`` entirely, so initialization is unaffected by the flags.
 
     Attributes:
         _allow_add (bool): Whether new keys can be added.
@@ -65,40 +76,33 @@ class ControlledDict(collections.UserDict, ABC):
     _allow_del: bool = True
     _allow_update: bool = True
 
-    def __init__(self, *args, **kwargs) -> None:
-        """Temporarily allow add during initialization."""
-        original_allow_add = self._allow_add
-
-        try:
-            self._allow_add = True
-            super().__init__(*args, **kwargs)
-        finally:
-            self._allow_add = original_allow_add
-
     # Override add/update operations
     def __setitem__(self, key, value) -> None:
         """Forbid adding or updating keys based on _allow_add and _allow_update."""
-        if key not in self.data and not self._allow_add:
+        if key not in self and not self._allow_add:
             raise TypeError(f"Cannot add new key {key!r}, because add is disabled.")
-        if key in self.data and not self._allow_update:
+        if key in self and not self._allow_update:
             raise TypeError(f"Cannot update key {key!r}, because update is disabled.")
 
-        super().__setitem__(key, value)
+        dict.__setitem__(self, key, value)
 
     def update(self, *args, **kwargs) -> None:
         """Forbid adding or updating keys based on _allow_add and _allow_update."""
+        # Materialize once so iterators are not consumed twice between
+        # validation and the actual update.
         updates = dict(*args, **kwargs)
-        for key in updates:
-            if key not in self.data and not self._allow_add:
-                raise TypeError(
-                    f"Cannot add new key {key!r} using update, because add is disabled."
-                )
-            if key in self.data and not self._allow_update:
-                raise TypeError(
-                    f"Cannot update key {key!r} using update, because update is disabled."
-                )
+        if not (self._allow_add and self._allow_update):
+            for key in updates:
+                if key not in self and not self._allow_add:
+                    raise TypeError(
+                        f"Cannot add new key {key!r} using update, because add is disabled."
+                    )
+                if key in self and not self._allow_update:
+                    raise TypeError(
+                        f"Cannot update key {key!r} using update, because update is disabled."
+                    )
 
-        super().update(updates)
+        dict.update(self, updates)
 
     def setdefault(self, key, default=None) -> Any:
         """Forbid adding or updating keys based on _allow_add and _allow_update.
@@ -106,7 +110,7 @@ class ControlledDict(collections.UserDict, ABC):
         Note: if not _allow_update, this method would NOT check whether the
             new default value is the same as current value for efficiency.
         """
-        if key not in self.data:
+        if key not in self:
             if not self._allow_add:
                 raise TypeError(
                     f"Cannot add new key using setdefault: {key!r}, because add is disabled."
@@ -116,32 +120,41 @@ class ControlledDict(collections.UserDict, ABC):
                 f"Cannot update key using setdefault: {key!r}, because update is disabled."
             )
 
-        return super().setdefault(key, default)
+        return dict.setdefault(self, key, default)
 
     # Override delete operations
     def __delitem__(self, key) -> None:
         """Forbid deleting keys when self._allow_del is False."""
         if not self._allow_del:
             raise TypeError(f"Cannot delete key {key!r}, because delete is disabled.")
-        super().__delitem__(key)
+        dict.__delitem__(self, key)
 
     def pop(self, key: Any, *args: Any) -> Any:
         """Forbid popping keys when self._allow_del is False."""
         if not self._allow_del:
             raise TypeError(f"Cannot pop key {key!r}, because delete is disabled.")
-        return super().pop(key, *args)
+        return dict.pop(self, key, *args)
 
     def popitem(self) -> tuple[Any, Any]:
-        """Forbid popping the last item when self._allow_del is False."""
+        """Pop the FIRST item (FIFO).
+
+        Preserves the previous ``collections.UserDict``-inherited semantics —
+        plain ``dict.popitem`` is LIFO, but monty users have historically
+        relied on FIFO behaviour.
+        """
         if not self._allow_del:
             raise TypeError("Cannot pop item, because delete is disabled.")
-        return super().popitem()
+        if not self:
+            raise KeyError("dictionary is empty")
+        key = next(iter(self))
+        value = dict.pop(self, key)
+        return key, value
 
     def clear(self) -> None:
         """Forbid clearing the dictionary when self._allow_del is False."""
         if not self._allow_del:
             raise TypeError("Cannot clear dictionary, because delete is disabled.")
-        super().clear()
+        dict.clear(self)
 
 
 class frozendict(ControlledDict):
@@ -185,7 +198,7 @@ class AttrDict(dict):
 
     def __setitem__(self, key, value) -> None:
         """Check if the key shadows dict method."""
-        if key in dir(dict):
+        if key in _DICT_METHOD_NAMES:
             warnings.warn(
                 f"'{key=}' shadows dict method. This may lead to unexpected behavior.",
                 UserWarning,

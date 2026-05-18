@@ -84,17 +84,23 @@ class lazy_property:
         if inst is None:
             return self
 
-        if not hasattr(inst, "__dict__"):
+        # Fast access via type(inst).__dict__ — avoids the descriptor-walking
+        # cost of ``hasattr(inst, "__dict__")`` for the common case (almost
+        # all classes have ``__dict__``) while still cheaply detecting
+        # slots-only objects without computing the value.
+        try:
+            inst_dict = inst.__dict__
+        except AttributeError as exc:
             raise AttributeError(
                 f"'{inst_cls.__name__}' object has no attribute '__dict__'"
-            )
+            ) from exc
 
         name = self.__name__  # type: ignore[attr-defined]  # pylint: disable=E1101
         if name.startswith("__") and not name.endswith("__"):
             name = f"_{inst_cls.__name__}{name}"
 
         value = self.__func(inst)
-        inst.__dict__[name] = value
+        inst_dict[name] = value
         return value
 
     @classmethod

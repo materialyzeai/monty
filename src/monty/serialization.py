@@ -27,15 +27,32 @@ if TYPE_CHECKING:
 
 _FILE_TYPE = Literal["json", "jsonl", "yaml", "mpk"]
 
+# A single ``YAML()`` instance is reusable across calls and avoids per-call
+# construction cost (the constructor walks ruamel.yaml resolver tables).
+_YAML = YAML()
+
 
 def _identify_format(file_name: str | Path) -> _FILE_TYPE:
-    """Identify the format of a file with name `file_name`."""
-    basename = os.path.basename(file_name).lower()
-    if ".mpk" in basename:
+    """Identify the format of a file with name ``file_name``.
+
+    Detection is based on extension (suffix) rather than substring match so a
+    file called ``"myjsonlist.json"`` is not mis-classified as JSON-lines and
+    ``"data.mpkfoo"`` is not classified as msgpack.
+    """
+    # ``os.path.basename`` is fast and avoids a ``Path`` allocation. We strip
+    # one layer of common compression suffixes so e.g. ``foo.json.gz`` is
+    # detected as JSON.
+    basename = os.path.basename(str(file_name)).lower()
+    for compressed_ext in (".gz", ".bz2", ".xz", ".lzma", ".z"):
+        if basename.endswith(compressed_ext):
+            basename = basename[: -len(compressed_ext)]
+            break
+
+    if basename.endswith(".mpk"):
         return "mpk"
-    if any(ext in basename for ext in (".yaml", ".yml")):
+    if basename.endswith((".yaml", ".yml")):
         return "yaml"
-    if "jsonl" in basename:
+    if basename.endswith(".jsonl"):
         return "jsonl"
     return "json"
 
@@ -82,8 +99,7 @@ def loadfn(
             if fmt == "yaml":
                 if YAML is None:
                     raise RuntimeError("Loading of YAML files requires ruamel.yaml.")
-                yaml = YAML()
-                return yaml.load(fp, *args, **kwargs)
+                return _YAML.load(fp, *args, **kwargs)
 
             if fmt in {"json", "jsonl"}:
                 if "cls" not in kwargs:
@@ -142,14 +158,17 @@ def dumpfn(
             if fmt == "yaml":
                 if YAML is None:
                     raise RuntimeError("Loading of YAML files requires ruamel.yaml.")
-                yaml = YAML()
-                yaml.dump(obj, fp, *args, **kwargs)
+                _YAML.dump(obj, fp, *args, **kwargs)
             elif fmt in {"json", "jsonl"}:
                 if "cls" not in kwargs:
                     kwargs["cls"] = MontyEncoder
                 if fmt == "jsonl":
+                    write = fp.write
                     for jobj in obj:  # type: ignore[var-annotated,attr-defined]
-                        fp.write(json.dumps(jobj, *args, **kwargs) + "\n")
+                        # Two writes avoid creating an intermediate ``str + "\n"``
+                        # for every record.
+                        write(json.dumps(jobj, *args, **kwargs))
+                        write("\n")
                 else:
                     fp.write(json.dumps(obj, *args, **kwargs))
             else:

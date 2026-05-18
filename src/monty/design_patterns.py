@@ -53,11 +53,14 @@ def cached_class(cls: type[Klass]) -> type[Klass]:
     orig_new = cls.__new__
     orig_init = cls.__init__
     cache: WeakValueDictionary = WeakValueDictionary()
+    # ``inspect.signature`` is one of the most expensive stdlib calls (typ.
+    # 10-100µs); hoist it out so we pay this cost once per decoration rather
+    # than once per instantiation.
+    sig = inspect.signature(orig_init)
 
     @wraps(orig_new)
     def new_new(cls, *args: Any, **kwargs: Any) -> Any:
         # Normalize arguments
-        sig = inspect.signature(orig_init)
         bound_args = sig.bind(None, *args, **kwargs)
         bound_args.apply_defaults()
 

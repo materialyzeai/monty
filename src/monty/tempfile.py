@@ -131,37 +131,40 @@ class ScratchDir:
                 if self.gzip_on_exit:
                     gzip_dir(self.tempdir)
 
-                # Timestamp check
-                def get_files(root: PathLike) -> set[str]:
-                    paths: set[str] = set()
-                    for dirpath, _, filenames in os.walk(root):
-                        for fn in filenames:
-                            abs_path = os.path.join(dirpath, fn)
-                            rel_path = os.path.relpath(abs_path, root)
-                            paths.add(rel_path)
-                    return paths
+                def walk_with_mtimes(root: PathLike) -> dict[str, float]:
+                    """Single-pass scandir walk: build {relpath -> mtime}.
 
-                def get_modif_times(
-                    root: PathLike,
-                    rel_paths: set[str],
-                ) -> dict[str, float]:
+                    ``DirEntry.stat()`` reuses the ``stat`` info collected by
+                    the directory iterator on most platforms, avoiding the
+                    extra syscall pair that ``os.walk`` + ``os.path.getmtime``
+                    would incur.
+                    """
                     out: dict[str, float] = {}
-                    for rel in rel_paths:
-                        # File may have been removed between listing and stat
-                        with contextlib.suppress(FileNotFoundError):
-                            out[rel] = os.path.getmtime(os.path.join(root, rel))
+                    root_str = os.fspath(root)
+                    stack: list[str] = [root_str]
+                    while stack:
+                        d = stack.pop()
+                        try:
+                            with os.scandir(d) as it:
+                                for entry in it:
+                                    if entry.is_dir(follow_symlinks=False):
+                                        stack.append(entry.path)
+                                    else:
+                                        with contextlib.suppress(FileNotFoundError):
+                                            out[
+                                                os.path.relpath(entry.path, root_str)
+                                            ] = entry.stat().st_mtime
+                        except FileNotFoundError:
+                            continue
                     return out
 
-                common_paths = get_files(self.tempdir) & get_files(self.cwd)
-                temp_mtimes = get_modif_times(self.tempdir, common_paths)
-                cwd_mtimes = get_modif_times(self.cwd, common_paths)
+                temp_mtimes = walk_with_mtimes(self.tempdir)
+                cwd_mtimes = walk_with_mtimes(self.cwd)
 
                 newer_in_cwd = [
                     rel
-                    for rel in common_paths
-                    if rel in temp_mtimes
-                    and rel in cwd_mtimes
-                    and cwd_mtimes[rel] > temp_mtimes[rel]
+                    for rel, t in cwd_mtimes.items()
+                    if rel in temp_mtimes and t > temp_mtimes[rel]
                 ]
 
                 if newer_in_cwd:

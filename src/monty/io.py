@@ -15,6 +15,7 @@ import subprocess
 import time
 import warnings
 from builtins import EncodingWarning as EncodingWarning
+from collections import deque
 from pathlib import Path
 from typing import IO, TYPE_CHECKING, Any, Literal, cast, overload
 
@@ -183,11 +184,12 @@ def reverse_readfile(
     Yields:
         Lines from the file in reverse order.
     """
-    # Get line ending
-    l_end = _get_line_ending(filename)
-    len_l_end = len(l_end)
-
     with zopen(filename, mode="rb") as file:
+        # Detect line ending from the already-open handle so compressed files
+        # are not opened twice.
+        l_end = _get_line_ending(file)  # type: ignore[arg-type]
+        len_l_end = len(l_end)
+
         if isinstance(file, (gzip.GzipFile, bz2.BZ2File)):
             for line in reversed(file.readlines()):
                 # "readlines" would keep the line end character
@@ -292,6 +294,10 @@ def reverse_readline(
         # Check if the file stream is text (instead of binary)
         is_text: bool = isinstance(m_file, io.TextIOWrapper)
 
+        # Use a deque of decoded chunks instead of repeated string concatenation
+        # to avoid O(N^2) behavior on large files. Chunks are joined only when
+        # the buffer must be searched/sliced for a line ending.
+        chunks: deque[str] = deque()
         buffer: str = ""
         m_file.seek(0, 2)
         skipped_1st_l_end: bool = False
@@ -317,16 +323,21 @@ def reverse_readline(
                 to_read: int = min(blk_size, pt_pos)
                 m_file.seek(pt_pos - to_read)
                 if is_text:
-                    buffer = cast(str, m_file.read(to_read)) + buffer
+                    chunk = cast(str, m_file.read(to_read))
                 else:
-                    buffer = cast(bytes, m_file.read(to_read)).decode("utf-8") + buffer
+                    chunk = cast(bytes, m_file.read(to_read)).decode("utf-8")
+                chunks.appendleft(buffer)
+                chunks.appendleft(chunk)
 
                 # Move pointer forward
                 m_file.seek(pt_pos - to_read)
 
                 # Add a l_end to the start of file
                 if pt_pos == to_read:
-                    buffer = l_end + buffer
+                    chunks.appendleft(l_end)
+
+                buffer = "".join(chunks)
+                chunks.clear()
 
             # Start of file
             else:  # l_end_pos == -1 and pt_post == 0

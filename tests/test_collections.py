@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from collections import UserDict
-
 import pytest
 
 from monty.collections import (
@@ -120,7 +118,7 @@ class TestControlledDict:
         ControlledDict._allow_update = False
 
         dct = ControlledDict({"hello": "world"})
-        assert isinstance(dct, UserDict)
+        assert isinstance(dct, dict)
         assert dct["hello"] == "world"
 
         assert not dct._allow_add
@@ -134,7 +132,7 @@ class TestControlledDict:
 
 def test_frozendict():
     dct = frozendict({"hello": "world"})
-    assert isinstance(dct, UserDict)
+    assert isinstance(dct, dict)
     assert dct["hello"] == "world"
 
     assert not dct._allow_add
@@ -160,7 +158,7 @@ def test_frozendict():
 
 def test_namespace_dict():
     dct = Namespace(key="val")
-    assert isinstance(dct, UserDict)
+    assert isinstance(dct, dict)
 
     # Test setter
     dct["hello"] = "world"
@@ -208,7 +206,7 @@ def test_attr_dict():
 
 def test_frozen_attrdict():
     dct = FrozenAttrDict({"hello": "world", 1: 2})
-    assert isinstance(dct, UserDict)
+    assert isinstance(dct, dict)
 
     # Test attribute-like operations
     with pytest.raises(TypeError, match="does not support item assignment"):
