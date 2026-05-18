@@ -151,9 +151,9 @@ class ScratchDir:
                                         stack.append(entry.path)
                                     else:
                                         with contextlib.suppress(FileNotFoundError):
-                                            out[os.path.relpath(entry.path, root_str)] = (
-                                                entry.stat().st_mtime
-                                            )
+                                            out[
+                                                os.path.relpath(entry.path, root_str)
+                                            ] = entry.stat().st_mtime
                         except FileNotFoundError:
                             continue
                     return out

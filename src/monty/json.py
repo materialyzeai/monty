@@ -880,9 +880,9 @@ class MontyDecoder(json.JSONDecoder):
                                 }
                                 return cls_(**d)
 
-                        if (not issubclass(cls_, MSONable)) and dataclasses.is_dataclass(
-                            cls_
-                        ):
+                        if (
+                            not issubclass(cls_, MSONable)
+                        ) and dataclasses.is_dataclass(cls_):
                             d = {k: self.process_decoded(v) for k, v in data.items()}
                             return cls_(**d)  # type: ignore[operator]
 

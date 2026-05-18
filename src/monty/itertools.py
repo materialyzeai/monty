@@ -53,9 +53,7 @@ def iterator_from_slice(s) -> Iterable:
     return iter(np.arange(start, s.stop, step))
 
 
-def iuptri(
-    items: Iterable, diago: bool = True, with_inds: bool = False
-) -> Iterable:
+def iuptri(items: Iterable, diago: bool = True, with_inds: bool = False) -> Iterable:
     """A generator that yields the upper triangle of the matrix (items x items).
 
     Args:
@@ -81,9 +79,7 @@ def iuptri(
                 yield item1, items[jj]
 
 
-def ilotri(
-    items: Iterable, diago: bool = True, with_inds: bool = False
-) -> Iterable:
+def ilotri(items: Iterable, diago: bool = True, with_inds: bool = False) -> Iterable:
     """A generator that yields the lower triangle of the matrix (items x items).
 
     Args:
