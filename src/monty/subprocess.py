@@ -22,29 +22,30 @@ __date__ = "10/26/14"
 
 
 class Command:
-    """Enables to run subprocess commands in a different thread with TIMEOUT
-    option.
+    """Run a subprocess command in a separate thread with a timeout.
 
-    Based on jcollado's solution:
-        http://stackoverflow.com/questions/1191374/subprocess-with-timeout/4825933#4825933
-    and
-        https://gist.github.com/kirpit/1306188
-
+    Based on jcollado's solution at
+    http://stackoverflow.com/questions/1191374/subprocess-with-timeout/4825933#4825933
+    and https://gist.github.com/kirpit/1306188.
 
     Attributes:
-        retcode: Return code of the subprocess
-        killed: True if subprocess has been killed due to the timeout
-        output: stdout of the subprocess
-        error: stderr of the subprocess
+        retcode: Return code of the subprocess.
+        killed: True if the subprocess was killed due to the timeout.
+        output: ``stdout`` of the subprocess.
+        error: ``stderr`` of the subprocess.
 
     Examples:
-        com = Command("sleep 1").run(timeout=2)
-        print(com.retcode, com.killed, com.output, com.output)
+        >>> com = Command("sleep 1").run(timeout=2)
+        >>> print(com.retcode, com.killed, com.output, com.output)
+
     """
 
     def __init__(self, command: str):
-        """Args:
-        command: Command to execute.
+        """Initialize the command.
+
+        Args:
+            command: Command to execute.
+
         """
         if is_string(command):
             _command: list[str] = shlex.split(command)
@@ -58,11 +59,15 @@ class Command:
         return f"command: {self.command}, retcode: {self.retcode}"
 
     def run(self, timeout: float | None = None, **kwargs) -> Self:
-        """Run a command in a separated thread and wait timeout seconds.
-        kwargs are keyword arguments passed to Popen.
+        """Run the command in a separate thread, waiting up to ``timeout`` seconds.
+
+        Args:
+            timeout: Maximum seconds to wait before killing the subprocess.
+            **kwargs: Keyword arguments passed to ``Popen``.
 
         Returns:
-            self
+            ``self``.
+
         """
 
         def target(**kw):

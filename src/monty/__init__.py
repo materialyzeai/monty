@@ -1,7 +1,8 @@
-"""Monty is the missing complement to Python. Monty implements supplementary
-useful functions for Python that are not part of the standard library.
-Examples include useful utilities like transparent support for zipped files,
-useful design patterns such as singleton and cached_class, and many more.
+"""Monty is the missing complement to Python.
+
+Monty implements supplementary utilities not in the standard library, such as
+transparent support for zipped files and design patterns like singleton and
+cached_class.
 """
 
 from __future__ import annotations

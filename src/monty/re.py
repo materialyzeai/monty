@@ -40,6 +40,7 @@ def regrep(
             key2: ...}
         For reverse reads, the lineno is given as a -ve number. Please note
         that 0-based indexing is used.
+
     """
     compiled = [(k, re.compile(v)) for k, v in patterns.items()]
     matches: dict[str, list] = collections.defaultdict(list)

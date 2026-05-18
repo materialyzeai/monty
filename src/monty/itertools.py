@@ -41,6 +41,7 @@ def iterator_from_slice(s) -> Iterable:
 
     Notes:
         The function returns an infinite iterator if s.stop is None
+
     """
     start = s.start if s.start is not None else 0
     step = s.step if s.step is not None else 1
@@ -66,6 +67,7 @@ def iuptri(items: Iterable, diago: bool = True, with_inds: bool = False) -> Iter
     ij: (0, 0) mate: (0, 0)
     ij: (0, 1) mate: (0, 1)
     ij: (1, 1) mate: (1, 1)
+
     """
     items = list(items)
     n = len(items)
@@ -92,6 +94,7 @@ def ilotri(items: Iterable, diago: bool = True, with_inds: bool = False) -> Iter
     ij: (0, 0) mate: (0, 0)
     ij: (1, 0) mate: (1, 0)
     ij: (1, 1) mate: (1, 1)
+
     """
     items = list(items)
     n = len(items)

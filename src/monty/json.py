@@ -46,8 +46,9 @@ __version__ = "3.0.0"
 
 @functools.cache
 def _init_spec(cls: type):
-    """Cache ``getfullargspec(cls.__init__)`` — typically the dominant cost
-    of ``MSONable.as_dict``.
+    """Cache ``getfullargspec(cls.__init__)``.
+
+    Typically the dominant cost of ``MSONable.as_dict``.
     """
     return getfullargspec(cls.__init__)  # type: ignore[misc]
 
@@ -81,10 +82,11 @@ _TYPE_STR_CACHE: dict[tuple[type, tuple[str, ...]], bool] = {}
 
 
 def _type_str_match(tp: type, type_strs: tuple[str, ...]) -> bool:
-    """Return whether ``tp.mro()`` contains any of the qualified names in
-    ``type_strs``. Result is cached per ``(type, type_strs)`` pair — most
-    callers query the same handful of strings against the same type
-    repeatedly (torch.Tensor, pandas.DataFrame, etc.).
+    """Return whether ``tp.mro()`` contains any qualified name in ``type_strs``.
+
+    Result is cached per ``(type, type_strs)`` pair — most callers query the
+    same handful of strings against the same type repeatedly (``torch.Tensor``,
+    ``pandas.DataFrame``, etc.).
     """
     key = (tp, type_strs)
     cached = _TYPE_STR_CACHE.get(key)
@@ -98,10 +100,12 @@ def _type_str_match(tp: type, type_strs: tuple[str, ...]) -> bool:
 
 
 class _LazyRedirect:
-    """Class-level descriptor that loads ``~/.monty.yaml`` lazily on first
-    access. Avoids paying the ``ruamel.yaml`` import + filesystem stat cost
-    on every ``import monty.json`` (which is on the import path of pymatgen,
-    matgl, matcalc, etc.)."""
+    """Class-level descriptor that loads ``~/.monty.yaml`` lazily on first access.
+
+    Avoids paying the ``ruamel.yaml`` import and filesystem stat cost on every
+    ``import monty.json`` (which is on the import path of pymatgen, matgl,
+    matcalc, etc.).
+    """
 
     def __init__(self) -> None:
         self._value: dict | None = None
@@ -149,29 +153,17 @@ def _load_redirect(redirect_file) -> dict:
 
 
 def _check_type(obj: object, type_str: tuple[str, ...] | str) -> bool:
-    """Alternative to isinstance that avoids imports.
+    """Import-free alternative to ``isinstance`` based on qualified type names.
 
-    Checks whether obj is an instance of the type defined by type_str. This
-    removes the need to explicitly import type_str. Handles subclasses like
-    isinstance does. E.g.:
-        class A:
-            pass
+    Checks whether ``obj`` is an instance of the type identified by
+    ``type_str`` (a fully qualified name like ``"torch.Tensor"``), which
+    avoids importing the type explicitly. Subclasses are matched, mirroring
+    ``isinstance`` semantics.
 
-
-        class B(A):
-            pass
-
-
-        a, b = A(), B()
-        assert isinstance(a, A)
-        assert isinstance(b, B)
-        assert isinstance(b, A)
-        assert not isinstance(a, B)
-
-    Note for future developers: the type_str is not always obvious for an
-    object. To find out the type_str for an object, run type(obj).mro(). This will
-    list all the types that an object can resolve to in order of generality
-    (all objects have the "builtins.object" as the last one).
+    Note for future developers: the ``type_str`` for a given object is not
+    always obvious. Use ``type(obj).mro()`` to enumerate the qualified names
+    that an object will match (in order of generality, with
+    ``"builtins.object"`` last).
     """
     # This function is intended as an alternative of "isinstance",
     # therefore wouldn't check class
@@ -183,8 +175,10 @@ def _check_type(obj: object, type_str: tuple[str, ...] | str) -> bool:
 
 
 def _recursive_as_dict(obj):
-    """Recursive helper for ``MSONable.as_dict`` — kept at module level so it
-    is not re-created on every ``as_dict`` invocation."""
+    """Recursive helper for ``MSONable.as_dict``.
+
+    Kept at module level so it is not re-created on every ``as_dict`` invocation.
+    """
     if isinstance(obj, (list, tuple)):
         return [_recursive_as_dict(it) for it in obj]
     if isinstance(obj, dict):
@@ -242,6 +236,7 @@ class MSONable:
 
     Example:
     old_module.old_class: new_module.new_class
+
     """
 
     # Backwards-compatible class attribute. The redirect file is loaded the
@@ -298,6 +293,7 @@ class MSONable:
 
         Returns:
             MSONable class.
+
         """
         # Reuse a single module-level decoder rather than allocating a new
         # ``MontyDecoder`` for every key, which used to dominate this path.
@@ -354,7 +350,7 @@ class MSONable:
 
     @classmethod
     def _validate_monty(cls, __input_value):
-        """pydantic Validator for MSONable pattern."""
+        """Pydantic Validator for MSONable pattern."""
         if isinstance(__input_value, cls):
             return __input_value
         if isinstance(__input_value, dict):
@@ -392,7 +388,7 @@ class MSONable:
 
     @classmethod
     def __get_pydantic_core_schema__(cls, source_type, handler):
-        """pydantic v2 core schema definition."""
+        """Pydantic v2 core schema definition."""
         try:
             from pydantic_core import core_schema
 
@@ -434,34 +430,22 @@ class MSONable:
         pickle_kwargs: dict | None = None,
         strict: bool = True,
     ) -> None:
-        """Utility that uses the standard tools of MSONable to convert the
-        class to json format, but also save it to disk. In addition, this
-        method intelligently uses pickle to individually pickle class objects
-        that are not serializable, saving them separately. This maximizes the
-        readability of the saved class information while allowing _any_
-        class to be at least partially serializable to disk.
+        """Serialize the instance to JSON on disk, pickling fields if needed.
 
-        For a fully MSONable class, only a class.json file will be saved to
-        the location {save_dir}/class.json. For a partially MSONable class,
-        additional information will be saved to the save directory at
-        {save_dir}. This includes a pickled object for each attribute that
-        e serialized.
+        For a fully MSONable class, only ``{save_dir}/class.json`` is written.
+        For a partially MSONable class, non-serializable attributes are
+        pickled individually into the same directory, keeping the JSON
+        portion readable.
 
-        Parameters
-        ----------
-        file_path : os.PathLike
-            The file to which to save the json object. A pickled object of
-            the same name but different extension might also be saved if the
-            class is not entirely MSONable.
-        mkdir : bool
-            If True, makes the provided directory, including all parent
-            directories.
-        json_kwargs : dict
-            Keyword arguments to pass to the serializer.
-        pickle_kwargs : dict
-            Keyword arguments to pass to pickle.dump.
-        strict : bool
-            If True, will not allow you to overwrite existing files.
+        Args:
+            json_path: The file to which to save the JSON object. A pickled
+                companion file with the same stem but a different extension
+                may also be written if the class is not entirely MSONable.
+            mkdir: If True, create the target directory (including parents).
+            json_kwargs: Keyword arguments forwarded to the JSON serializer.
+            pickle_kwargs: Keyword arguments forwarded to ``pickle.dump``.
+            strict: If True, refuse to overwrite existing files.
+
         """
         save(
             self,
@@ -474,17 +458,14 @@ class MSONable:
 
     @classmethod
     def load(cls, file_path: os.PathLike | str) -> MSONable:
-        """Loads a class from a provided json file.
+        """Load an instance from a JSON file written by :meth:`save`.
 
-        Parameters
-        ----------
-        file_path : os.PathLike
-            The json file to load from.
+        Args:
+            file_path: The JSON file to load from.
 
-        Returns
-        -------
-        MSONable
+        Returns:
             An instance of the class being reloaded.
+
         """
         d = load2dict(file_path)
         return cls.from_dict(d)
@@ -498,35 +479,22 @@ def save(
     pickle_kwargs: dict | None = None,
     strict: bool = True,
 ) -> None:
-    """Utility that uses the standard tools of MSONable to convert the
-    class to json format, but also save it to disk. In addition, this
-    method intelligently uses pickle to individually pickle class objects
-    that are not serializable, saving them separately. This maximizes the
-    readability of the saved class information while allowing _any_
-    class to be at least partially serializable to disk.
+    """Serialize an object to JSON on disk, pickling fields if needed.
 
-    For a fully MSONable class, only a class.json file will be saved to
-    the location {save_dir}/class.json. For a partially MSONable class,
-    additional information will be saved to the save directory at
-    {save_dir}. This includes a pickled object for each attribute that
-    e serialized.
+    For a fully MSONable object, only ``{save_dir}/class.json`` is written.
+    For a partially MSONable object, non-serializable attributes are pickled
+    individually into the same directory, keeping the JSON portion readable.
 
     Args:
-    obj : Object
-        The object to save.
-    file_path : os.PathLike
-        The file to which to save the json object. A pickled object of
-        the same name but different extension might also be saved if the
-        class is not entirely MSONable.
-    mkdir : bool
-        If True, makes the provided directory, including all parent
-        directories.
-    json_kwargs : dict
-        Keyword arguments to pass to the serializer.
-    pickle_kwargs : dict
-        Keyword arguments to pass to pickle.dump.
-    strict : bool
-        If True, will not allow you to overwrite existing files.
+        obj: The object to save.
+        json_path: The file to which to save the JSON object. A pickled
+            companion file with the same stem but a different extension may
+            also be written if ``obj`` is not entirely MSONable.
+        mkdir: If True, create the target directory (including parents).
+        json_kwargs: Keyword arguments forwarded to the JSON serializer.
+        pickle_kwargs: Keyword arguments forwarded to ``pickle.dump``.
+        strict: If True, refuse to overwrite existing files.
+
     """
     json_path = Path(json_path)
     save_dir = json_path.parent
@@ -559,16 +527,14 @@ def save(
 
 
 def load(path: os.PathLike | str) -> MSONable:
-    """Loads a json file that was saved using MSONable.save.
+    """Load an MSONable object from a JSON file written by :func:`save`.
 
-    Parameters
-    ----------
-    path : os.PathLike
-        Path to the json file to load.
+    Args:
+        path: Path to the JSON file to load.
 
-    Returns
-    -------
-    MSONable
+    Returns:
+        The reconstructed MSONable instance.
+
     """
     d = load2dict(path)
     module = d["@module"]
@@ -579,16 +545,14 @@ def load(path: os.PathLike | str) -> MSONable:
 
 
 def load2dict(file_path: os.PathLike | str) -> dict:
-    """Load a serialized json file into a dictionary.
+    """Load a JSON file written by :func:`save` into a dictionary.
 
-    Assumes that you saved using `save` and will
-    load the json file into a dictionary.
-
-    Arg:
-        file_path: (str) Path to the json file.
+    Args:
+        file_path (str): Path to the JSON file.
 
     Returns:
-        (dict) The dictionary representation of the json file.
+        dict: The dictionary representation of the JSON file.
+
     """
     json_path = Path(file_path)
     save_dir = json_path.parent
@@ -619,11 +583,15 @@ def _recursive_name_object_map_replacement(d, name_object_map):
 
 
 class MontyEncoder(json.JSONEncoder):
-    """A Json Encoder which supports the MSONable API, plus adds support for
-    NumPy arrays, datetime objects, bson ObjectIds (requires bson).
-    Usage::
-        # Add it as a *cls* keyword when using json.dump
-        json.dumps(object, cls=MontyEncoder).
+    """JSON encoder that supports the MSONable API.
+
+    Adds support for NumPy arrays, ``datetime`` objects, and bson
+    ``ObjectId`` (when ``bson`` is installed).
+
+    Examples:
+        >>> import json
+        >>> json.dumps(object, cls=MontyEncoder)
+
     """
 
     def __init__(
@@ -641,17 +609,18 @@ class MontyEncoder(json.JSONEncoder):
         return {"@object_reference": name}
 
     def default(self, o) -> dict:
-        """Overriding default method for JSON encoding. This method does two
-        things: (a) If an object has a to_dict property, return the to_dict
-        output. (b) If the @module and @class keys are not in the to_dict,
-        add them to the output automatically. If the object has no to_dict
-        property, the default Python json encoder default method is called.
+        """Encode an object for JSON serialization.
+
+        If the object has an ``as_dict`` method, its output is used and
+        ``@module``/``@class`` keys are added automatically if missing. Falls
+        back to ``json.JSONEncoder.default`` otherwise.
 
         Args:
             o: Python object.
 
-        Return:
+        Returns:
             Python dict representation.
+
         """
         if isinstance(o, datetime.datetime):
             return {
@@ -776,23 +745,20 @@ class MontyEncoder(json.JSONEncoder):
 
 
 class MontyDecoder(json.JSONDecoder):
-    """A Json Decoder which supports the MSONable API. By default, the
-    decoder attempts to find a module and name associated with a dict. If
-    found, the decoder will generate a Pymatgen as a priority.  If that fails,
-    the original decoded dictionary from the string is returned. Note that
-    nested lists and dicts containing pymatgen object will be decoded correctly
-    as well.
+    """JSON decoder that supports the MSONable API.
 
-    Usage:
+    Inspects each decoded dict for ``@module``/``@class`` keys and rebuilds
+    the corresponding object when possible, falling back to the raw dict
+    otherwise. Nested lists and dicts of MSONable objects decode correctly.
 
-        # Add it as a *cls* keyword when using json.load
-        json.loads(json_string, cls=MontyDecoder)
+    Examples:
+        >>> import json
+        >>> json.loads(json_string, cls=MontyDecoder)
+
     """
 
     def process_decoded(self, d: Any) -> Any:
-        """Recursive method to support decoding dicts and lists containing
-        pymatgen objects.
-        """
+        """Recursively decode dicts and lists containing MSONable objects."""
         if isinstance(d, dict):
             if "@module" in d and "@class" in d:
                 modname = d["@module"]
@@ -960,6 +926,7 @@ class MontyDecoder(json.JSONDecoder):
 
         Returns:
             Decoded object.
+
         """
         if bson is not None:
             # ``JSONOptions`` is moved to module scope so we do not allocate
@@ -986,10 +953,10 @@ def jsanitize(
     enum_values: bool = False,
     recursive_msonable: bool = False,
 ) -> Any:
-    """This method cleans an input json-like object, either a list or a dict or
-    some sequence, nested or otherwise, by converting all non-string
-    dictionary keys (such as int and float) to strings, and also recursively
-    encodes all objects using Monty's as_dict() protocol.
+    """Recursively sanitize a JSON-like object for serialization.
+
+    Walks lists/dicts (nested or otherwise), converts non-string dict keys to
+    strings, and recursively encodes objects via Monty's ``as_dict`` protocol.
 
     Args:
         obj: input json-like object.
@@ -1010,6 +977,7 @@ def jsanitize(
 
     Returns:
         Sanitized dict that can be json serialized.
+
     """
     if isinstance(obj, Enum):
         if enum_values:
@@ -1162,8 +1130,10 @@ def _serialize_callable(o):
 
 
 def _get_partial_json(obj, json_kwargs):
-    """Gets the json representation of a class
-    with the unserializable components substituted for hash references.
+    """Return the JSON representation of an object with unserializable parts substituted.
+
+    Unserializable components are replaced with hash references that
+    :func:`partial_monty_encode` can map back to pickled companions.
     """
     json_kwargs = json_kwargs or {}
     encoder = MontyEncoder(allow_unserializable_objects=True, **json_kwargs)
@@ -1176,20 +1146,16 @@ def partial_monty_encode(
 ) -> tuple[str, dict | None]:
     """Encode an object that may contain unhashable parts.
 
-    Parameters
-    ----------
-    obj : object
-        The object to encode.
-    json_kwargs : dict
-        Keyword arguments to pass to the serializer.
+    Args:
+        obj: The object to encode.
+        json_kwargs: Keyword arguments forwarded to the JSON serializer.
 
-    Returns
-    -------
-    str, dict
-        The json encoding of the class and the name-object map if one is
-        required, otherwise ``None`` (previously an empty ``{}`` was
-        returned, which caused ``save()`` to always write an empty
-        ``.pkl`` companion file).
+    Returns:
+        A ``(json_string, name_object_map)`` pair. The map is ``None`` when
+        no unserializable parts were encountered — previously an empty dict
+        was returned, which caused ``save()`` to always write an empty
+        ``.pkl`` companion file.
+
     """
     encoder, encoded = _get_partial_json(
         obj=obj,

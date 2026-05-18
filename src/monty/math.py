@@ -17,6 +17,7 @@ def nCr(n: int, r: int) -> int:
 
     Returns:
         nCr.
+
     """
     return math.comb(n, r)
 
@@ -31,5 +32,6 @@ def nPr(n: int, r: int) -> int:
 
     Returns:
         nPr.
+
     """
     return math.perm(n, r)

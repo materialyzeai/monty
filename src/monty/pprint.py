@@ -23,6 +23,7 @@ def pprint_table(
         table: The table to print. A list of lists.
         out: Output stream (file-like object)
         rstrip: if True, trailing whitespace is removed from the entries.
+
     """
 
     def max_width_col(table: list[list], col_idx: int) -> int:
@@ -64,6 +65,7 @@ def draw_tree(
     string. The resulting tree is drawn into a buffer and returned as a string.
 
     Based on https://pypi.python.org/pypi/asciitree/
+
     """
     return _draw_tree(node, "", child_iter, text_str)
 
@@ -126,6 +128,7 @@ def pprint_json(data: Any) -> None:
 
     Based on:
     https://gist.github.com/jmmshn/d37d5a1be80a6da11f901675f195ca22
+
     """
     from IPython.display import JSON, display  # pylint: disable=C0415
 

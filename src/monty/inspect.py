@@ -12,8 +12,7 @@ if TYPE_CHECKING:
 
 
 def all_subclasses(cls: type) -> list[type]:
-    """Given a class ``cls``, this function returns a list with all subclasses,
-    subclasses of subclasses, and so on.
+    """Return all subclasses of ``cls``, including transitive ones.
 
     Uses an explicit stack with ``set``-based de-duplication so a class that
     appears under multiple base classes (diamond inheritance) is not reported
@@ -33,7 +32,7 @@ def all_subclasses(cls: type) -> list[type]:
 
 
 def find_top_pyfile() -> str:
-    """This function inspects the Cpython frame to find the path of the script."""
+    """Return the absolute path of the top-most script in the call stack."""
     frame = currentframe()
     if frame is None:
         raise RuntimeError("Could not obtain current frame.")

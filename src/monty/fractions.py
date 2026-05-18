@@ -20,6 +20,7 @@ def gcd(*numbers: int) -> int:
 
     Returns:
         int: Greatest common divisor of numbers.
+
     """
     return math.gcd(*numbers)
 
@@ -33,20 +34,23 @@ def lcm(*numbers: int) -> int:
 
     Returns:
         int: Lowest common multiple of numbers.
+
     """
     return math.lcm(*numbers)
 
 
 def gcd_float(numbers: Sequence[float], tol: float = 1e-8) -> float:
-    """Returns the greatest common divisor for a sequence of numbers.
+    """Return the greatest common divisor for a sequence of numbers.
+
     Uses a numerical tolerance, so can be used on floats.
 
     Args:
         numbers: Sequence of numbers.
-        tol: Numerical tolerance
+        tol: Numerical tolerance.
 
     Returns:
         float: Greatest common divisor of numbers.
+
     """
 
     def pair_gcd_tol(a: float, b: float) -> float:

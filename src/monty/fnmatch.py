@@ -1,4 +1,4 @@
-"""This module provides support for Unix shell-style wildcards."""
+"""Support for Unix shell-style wildcards."""
 
 from __future__ import annotations
 
@@ -9,8 +9,7 @@ from monty.string import list_strings
 
 
 class WildCard:
-    """This object provides an easy-to-use interface for filename matching with
-    shell patterns (fnmatch).
+    """Convenience wrapper for filename matching with multiple shell patterns.
 
     >>> w = WildCard("*.nc|*.pdf")
     >>> w.filter(["foo.nc", "bar.pdf", "hello.txt"])
@@ -27,6 +26,7 @@ class WildCard:
             wildcard (str): String of tokens separated by sep. Each token
                 represents a pattern.
             sep (str): Separator for shell patterns.
+
         """
         self.pats: list[str] = wildcard.split(sep) if wildcard else ["*"]
         # Pre-compile each pattern once so per-call matching does not pay the

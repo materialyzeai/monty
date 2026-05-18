@@ -39,6 +39,7 @@ class ScratchDir:
         of the functionality of ScratchDir. However, it does not provide
         options for copying of files to and from (though it is possible to
         do this with other methods provided by shutil).
+
     """
 
     SCR_LINK: ClassVar[str] = "scratch_link"
@@ -84,6 +85,7 @@ class ScratchDir:
                 Defaults to False.
             delete_removed_files (DEPRECATED): It now has no effect
                 and will be removed in 2027-01-01.
+
         """
         if delete_removed_files is not None:
             warnings.warn(

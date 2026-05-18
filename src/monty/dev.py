@@ -1,6 +1,4 @@
-"""This module implements several useful functions and decorators that can be
-particularly useful for developers. E.g., deprecating methods / classes, etc.
-"""
+"""Developer-facing utilities, e.g. decorators for deprecating methods or classes."""
 
 from __future__ import annotations
 
@@ -39,6 +37,7 @@ def deprecated(
 
     Returns:
         Original function/class, but with a warning to use the replacement.
+
     """
 
     def craft_message(
@@ -144,22 +143,30 @@ class requires:
     Args:
         condition: Condition necessary to use the class or function.
         message: A message to be displayed if the condition is not True.
+
     """
 
     def __init__(
         self, condition: bool, message: str, err_cls: type[Exception] = RuntimeError
     ) -> None:
-        """Args:
-        condition: A expression returning a bool.
-        message: Message to display if condition is False.
+        """Initialize the requires decorator.
+
+        Args:
+            condition: An expression returning a bool.
+            message: Message to display if condition is False.
+            err_cls: Exception class to raise when condition is False.
+
         """
         self.condition = condition
         self.message = message
         self.err_cls = err_cls
 
     def __call__(self, _callable: Callable) -> Callable:
-        """Args:
-        _callable: Callable function.
+        """Wrap ``_callable`` so it raises when the condition is False.
+
+        Args:
+            _callable: Callable function.
+
         """
 
         @functools.wraps(_callable)
@@ -172,14 +179,15 @@ class requires:
 
 
 def install_excepthook(hook_type: str = "color", **kwargs) -> int:
-    """This function replaces the original python traceback with an improved
-    version from Ipython. Use `color` for colourful traceback formatting,
-    `verbose` for Ka-Ping Yee's "cgitb.py" version kwargs are the keyword
-    arguments passed to the constructor. See IPython.core.ultratb.py for more
-    info.
+    """Replace the default Python traceback with an improved version from IPython.
+
+    Use ``color`` for colourful traceback formatting or ``verbose`` for the
+    Ka-Ping Yee ``cgitb.py`` style. ``kwargs`` are forwarded to the hook
+    constructor; see ``IPython.core.ultratb`` for details.
 
     Returns:
         0 if hook is installed successfully.
+
     """
     try:
         from IPython.core import ultratb  # pylint: disable=import-outside-toplevel

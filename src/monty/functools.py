@@ -16,17 +16,21 @@ if TYPE_CHECKING:
 
 
 class _HashedSeq(list):
-    """This class guarantees that hash() will be called no more than once
-    per element.  This is important because the lru_cache() will hash
-    the key multiple times on a cache miss.
+    """Cache key wrapper that ensures ``hash()`` is called at most once per element.
+
+    ``lru_cache`` hashes the key multiple times on a cache miss; storing the
+    precomputed hash avoids repeating that work.
     """
 
     __slots__ = ("hashvalue",)
 
     def __init__(self, tup: tuple, hashfunc: Callable = hash) -> None:
-        """Args:
-        tup: Tuple.
-        hashfunc: Hash function.
+        """Initialize the hashed sequence.
+
+        Args:
+            tup: Tuple.
+            hashfunc: Hash function.
+
         """
         self[:] = tup
         self.hashvalue: int = hashfunc(tup)
@@ -67,15 +71,18 @@ def _make_key(
 
 
 class lazy_property:
-    """lazy_property descriptor.
+    """Descriptor that turns a method into a lazily evaluated attribute.
 
-    Used as a decorator to create lazy attributes. Lazy attributes
-    are evaluated on first use.
+    The wrapped function is called once on first access; the returned value
+    is cached on the instance's ``__dict__`` for subsequent lookups.
     """
 
     def __init__(self, func: Callable) -> None:
-        """Args:
-        func: Function to decorate.
+        """Initialize the descriptor.
+
+        Args:
+            func: Function to decorate.
+
         """
         self.__func = func
         wraps(self.__func)(self)  # type: ignore[arg-type]
@@ -132,12 +139,13 @@ class lazy_property:
 def return_if_raise(
     exception_tuple: list | tuple, retval_if_exc: Any, disabled: bool = False
 ) -> Any:
-    """Decorator for functions, methods or properties. Execute the callable in a
-    try block, and return retval_if_exc if one of the exceptions listed in
-    exception_tuple is raised (se also ``return_node_if_raise``).
+    """Return ``retval_if_exc`` when the decorated callable raises a listed exception.
 
-    Setting disabled to True disables the try except block (useful for
-    debugging purposes). One can use this decorator to define properties.
+    The callable is invoked inside a ``try`` block; any of the exceptions in
+    ``exception_tuple`` cause ``retval_if_exc`` to be returned instead (see
+    also ``return_node_if_raise``). Setting ``disabled=True`` skips the
+    ``try``/``except`` (useful for debugging). Works on functions, methods,
+    and properties.
 
     Examples:
         @return_if_raise(ValueError, None)
@@ -190,21 +198,25 @@ This decorator returns None if one of the exceptions is raised.
 
 
 class timeout:
-    """Timeout function. Use to limit matching to a certain time limit. Note that
-    this works only on Unix-based systems as it uses signal.
+    """Context manager that aborts a block of code after a time limit.
 
-    Usage:
-        try:
-            with timeout(3):
-                do_stuff()
-        except TimeoutError:
-            do_something_else()
+    Works only on Unix-based systems since it relies on ``signal.SIGALRM``.
+
+    Examples:
+        >>> try:
+        ...     with timeout(3):
+        ...         do_stuff()
+        ... except TimeoutError:
+        ...     do_something_else()
+
     """
 
     def __init__(self, seconds: int = 1, error_message: str = "Timeout"):
-        """Args:
-        seconds (int): Allowed time for function in seconds.
-        error_message (str): An error message.
+        """Initialize the timeout context manager.
+
+        Args:
+            seconds (int): Allowed time for function in seconds.
+            error_message (str): An error message.
 
         """
         self.seconds = seconds
@@ -216,6 +228,7 @@ class timeout:
         Args:
             signum: Return signal from call.
             frame: Current stack frame.
+
         """
         raise TimeoutError(self.error_message)
 
@@ -231,8 +244,11 @@ class TimeoutError(Exception):
     """Exception class for timeouts."""
 
     def __init__(self, message: str):
-        """Args:
-        message: Error message.
+        """Initialize the exception.
+
+        Args:
+            message: Error message.
+
         """
         self.message = message
 
@@ -256,6 +272,7 @@ def prof_main(main: Callable) -> Callable:
                 If not given, a temporary file is created.
             sortby: Profiling data are sorted according to this value.
                 default is "time". See sort_stats.
+
     """
 
     @wraps(main)

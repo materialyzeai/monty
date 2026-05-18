@@ -1,6 +1,4 @@
-"""This module implements serialization support for common formats such as json
-and yaml.
-"""
+"""Serialization helpers for common formats (JSON, JSONL, YAML, msgpack)."""
 
 from __future__ import annotations
 
@@ -63,25 +61,24 @@ def loadfn(
     fmt: _FILE_TYPE | None = None,
     **kwargs,
 ) -> Any:
-    """Loads json/yaml/msgpack directly from a filename instead of a
-    File-like object. File may also be a BZ2 (".BZ2") or GZIP (".GZ", ".Z")
-    compressed file.
-    For YAML, ruamel.yaml must be installed. The file type is automatically
-    detected from the file extension (case insensitive).
-    YAML is assumed if the filename contains ".yaml" or ".yml".
-    Msgpack is assumed if the filename contains ".mpk".
-    JSON lines is assumed if the filename contains "jsonl".
-    JSON is otherwise assumed.
+    """Load JSON/JSONL/YAML/msgpack from a filename.
+
+    Supports BZ2 (``.bz2``), GZIP (``.gz``, ``.z``), XZ (``.xz``, ``.lzma``)
+    compressed inputs transparently. YAML support requires ``ruamel.yaml``.
+    Format is auto-detected from the (case-insensitive) extension: ``.yaml``
+    / ``.yml`` → YAML; ``.mpk`` → msgpack; ``.jsonl`` → JSON lines; otherwise
+    JSON.
 
     Args:
-        fn (str/Path): filename or pathlib.Path.
-        *args: Any of the args supported by json/yaml.load.
-        fmt ("json" | "jsonl" | "yaml" | "mpk"): If specified, the fmt
-            specified would be used instead of autodetection from filename.
-        **kwargs: Any of the kwargs supported by json/yaml.load.
+        fn (str | Path): Filename or ``pathlib.Path``.
+        *args: Any of the args supported by ``json``/``yaml``/``msgpack.load``.
+        fmt ("json" | "jsonl" | "yaml" | "mpk"): If provided, overrides the
+            auto-detected format.
+        **kwargs: Any of the kwargs supported by ``json``/``yaml``/``msgpack.load``.
 
     Returns:
-        object: Result of json/yaml/msgpack.load.
+        object: Result of ``json``/``yaml``/``msgpack.load``.
+
     """
     fmt = fmt or _identify_format(fn)
 
@@ -119,26 +116,22 @@ def dumpfn(
     fmt: _FILE_TYPE | None = None,
     **kwargs,
 ) -> None:
-    """Dump to a json/yaml directly by filename instead of a
-    File-like object. File may also be a BZ2 (".BZ2") or GZIP (".GZ", ".Z")
-    compressed file.
-    For YAML, ruamel.yaml must be installed. The file type is automatically
-    detected from the file extension (case insensitive). YAML is assumed if the
-    filename contains ".yaml" or ".yml".
-    Msgpack is assumed if the filename contains ".mpk".
-    JSON lines is assumed if the filename contains "jsonl".
-    JSON is otherwise assumed.
+    """Dump an object to a JSON/JSONL/YAML/msgpack file by filename.
+
+    Supports BZ2 (``.bz2``), GZIP (``.gz``, ``.z``), XZ (``.xz``, ``.lzma``)
+    compressed outputs transparently. YAML support requires ``ruamel.yaml``.
+    Format is auto-detected from the (case-insensitive) extension: ``.yaml``
+    / ``.yml`` → YAML; ``.mpk`` → msgpack; ``.jsonl`` → JSON lines; otherwise
+    JSON.
 
     Args:
         obj (object): Object to dump.
-        fn (str/Path): filename or pathlib.Path.
-        fmt ("json" | "jsonl" | "yaml" | "mpk"): If specified, the fmt specified would
-            be used instead of autodetection from filename.
-        *args: Any of the args supported by json/yaml.dump.
-        **kwargs: Any of the kwargs supported by json/yaml.dump.
+        fn (str | Path): Filename or ``pathlib.Path``.
+        fmt ("json" | "jsonl" | "yaml" | "mpk"): If provided, overrides the
+            auto-detected format.
+        *args: Any of the args supported by ``json``/``yaml``/``msgpack.dump``.
+        **kwargs: Any of the kwargs supported by ``json``/``yaml``/``msgpack.dump``.
 
-    Returns:
-        (object) Result of json.load.
     """
     fmt = fmt or _identify_format(fn)
 

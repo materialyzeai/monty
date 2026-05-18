@@ -16,15 +16,18 @@ if TYPE_CHECKING:
 
 
 def zpath(filename: PathLike) -> str:
-    """Returns an existing (zipped or unzipped) file path given the unzipped
-    version. If no path exists, returns the filename unmodified.
+    """Return an existing (zipped or unzipped) path for ``filename``.
+
+    Probes for ``filename`` and the common compressed variants. If none
+    exist, the input is returned unchanged.
 
     Args:
-        filename: filename without zip extension
+        filename: Filename without a zip extension.
 
     Returns:
-        str: filename with a zip extension (unless an unzipped version exists).
-            If filename is not found, the same filename is returned unchanged.
+        str: Filename with a zip extension if such a file exists, otherwise
+        the unzipped name (returned unchanged if no variant is found).
+
     """
     filename = str(filename)  # ensure we work with strings
     # First entry is empty so we probe the unzipped form below; skip it when
@@ -47,9 +50,9 @@ def find_exts(
     include_dirs: str | None = None,
     match_mode: Literal["basename", "abspath"] = "basename",
 ) -> list[str]:
-    """Find all files with the extension listed in `exts` that are located within
-    the directory tree rooted at `top` (including top itself, but excluding
-    '.' and '..').
+    """Find all files matching ``exts`` under the directory tree rooted at ``top``.
+
+    Includes ``top`` itself but excludes ``.`` and ``..``.
 
     Args:
         top (str): Root directory
@@ -75,6 +78,7 @@ def find_exts(
         # Find all ps files, in the directories whose basename starts with
         # output.
         find_exts(".", "ps", include_dirs="output*"))
+
     """
     # ``str.endswith`` accepts a tuple at the C level, which is several times
     # faster than the equivalent ``any(... for ext in exts)`` comprehension.

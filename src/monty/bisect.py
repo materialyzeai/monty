@@ -1,9 +1,8 @@
-"""Additional bisect functions. Taken from
-https://docs.python.org/2/library/bisect.html
-The above bisect() functions are useful for finding insertion points but can be
-tricky or awkward to use for common searching tasks.
-The functions show how to transform them into the standard lookups for sorted
-lists.
+"""Additional bisect functions for common searching tasks on sorted lists.
+
+Adapted from https://docs.python.org/2/library/bisect.html. The stdlib
+``bisect()`` functions are useful for finding insertion points but can be
+awkward for direct lookups; these helpers wrap them as standard searches.
 """
 
 from __future__ import annotations

@@ -15,18 +15,18 @@ except ImportError as exc:
 
 
 def imap_tqdm(nprocs: int, func: Callable, iterable: Iterable, *args, **kwargs) -> list:
-    """A wrapper around Pool.imap. Creates a Pool with nprocs and then runs a f
-    unction over an iterable with progress bar.
+    """Run ``Pool.imap`` over ``iterable`` with a ``tqdm`` progress bar.
 
     Args:
-        nprocs: Number of processes
-        func: Callable
+        nprocs: Number of processes.
+        func: Callable applied to each item.
         iterable: Iterable of arguments.
-        args: Passthrough to Pool.imap
-        kwargs: Passthrough to Pool.imap
+        args: Passthrough to ``Pool.imap``.
+        kwargs: Passthrough to ``Pool.imap``.
 
     Returns:
-        Results of Pool.imap.
+        Results of ``Pool.imap``.
+
     """
     data = []
     with Pool(nprocs) as pool:

@@ -15,6 +15,7 @@ def operator_from_str(op: str) -> Callable:
 
     Raises:
         `KeyError` if invalid string.
+
     """
     d = {
         "==": operator.eq,

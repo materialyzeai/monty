@@ -1,14 +1,12 @@
-"""Useful collection classes:
-- tree: A recursive `defaultdict` for creating nested dictionaries
-    with default values.
-- ControlledDict: A base dict class with configurable mutability.
-- frozendict: An immutable dictionary.
-- Namespace: A dict doesn't allow changing values, but could
-    add new keys,
-- AttrDict: A dict whose values could be access as `dct.key`.
-- FrozenAttrDict: An immutable version of `AttrDict`.
-- MongoDict: A dict-like object whose values are nested dicts
-    could be accessed as attributes.
+"""Useful collection classes.
+
+- ``tree``: a recursive ``defaultdict`` for nested dictionaries with default values.
+- ``ControlledDict``: a base ``dict`` with configurable mutability.
+- ``frozendict``: an immutable dictionary.
+- ``Namespace``: a dict that allows adding new keys but not updating or deleting them.
+- ``AttrDict``: a dict whose values can be accessed as ``dct.key``.
+- ``FrozenAttrDict``: an immutable version of ``AttrDict``.
+- ``MongoDict``: a dict-like object whose nested-dict values are accessible as attributes.
 """
 
 from __future__ import annotations
@@ -30,15 +28,15 @@ _DICT_METHOD_NAMES: frozenset[str] = frozenset(dir(dict))
 
 
 def tree() -> collections.defaultdict:
-    """A tree object, which is effectively a recursive defaultdict that
-    adds tree as members.
+    """Build a recursive ``defaultdict`` that auto-creates nested trees on access.
 
-    Usage:
-        x = tree()
-        x["a"]["b"]["c"] = 1
+    Examples:
+        >>> x = tree()
+        >>> x["a"]["b"]["c"] = 1
 
     Returns:
         A tree.
+
     """
     return collections.defaultdict(tree)
 
@@ -70,6 +68,7 @@ class ControlledDict(dict, ABC):
             - `pop(key)`
             - `popitem`
             - `clear()`
+
     """
 
     _allow_add: bool = True
@@ -158,8 +157,9 @@ class ControlledDict(dict, ABC):
 
 
 class frozendict(ControlledDict):
-    """A dictionary that does not permit changes. The naming
-    violates PEP 8 to be consistent with the built-in `frozenset` naming.
+    """A dictionary that does not permit changes.
+
+    The naming violates PEP 8 to be consistent with the built-in ``frozenset``.
     """
 
     _allow_add: bool = False
@@ -190,6 +190,7 @@ class AttrDict(dict):
 
     References:
         https://stackoverflow.com/a/14620633/24021108
+
     """
 
     def __init__(self, *args, **kwargs) -> None:
@@ -208,10 +209,10 @@ class AttrDict(dict):
 
 
 class FrozenAttrDict(frozendict):
-    """A dictionary that:
+    """An immutable dict that also exposes values as attributes.
+
     - Does not permit changes (add/update/delete).
-    - Allows accessing values as `dct.key` in addition to
-        the traditional way `dct["key"]`.
+    - Allows accessing values as ``dct.key`` in addition to ``dct["key"]``.
     """
 
     def __init__(self, *args, **kwargs) -> None:
@@ -238,12 +239,11 @@ class FrozenAttrDict(frozendict):
 
 
 class MongoDict:
-    """This dict-like object allows one to access the entries in a nested dict as
-    attributes.
-    Entries (attributes) cannot be modified. It also provides Ipython tab
-    completion hence this object is particularly useful if you need to analyze
-    a nested dict interactively (e.g. documents extracted from a MongoDB
-    database).
+    """Read-only view of a nested dict that exposes entries as attributes.
+
+    Entries cannot be modified. Provides IPython tab completion, which makes
+    it convenient for interactive exploration of nested dicts (e.g. documents
+    extracted from a MongoDB database).
 
     >>> m_dct = MongoDict({"a": {"b": 1}, "x": 2})
     >>> assert m_dct.a.b == 1 and m_dct.x == 2
@@ -252,15 +252,19 @@ class MongoDict:
     {"b": 1}
 
     Notes:
-        Cannot inherit from ABC collections.Mapping because otherwise
-        dict.keys and dict.items will pollute the namespace.
-        e.g MongoDict({"keys": 1}).keys would be the ABC dict method.
+        Cannot inherit from ``collections.abc.Mapping`` because ``dict.keys``
+        and ``dict.items`` would pollute the namespace, e.g.
+        ``MongoDict({"keys": 1}).keys`` would be the ABC method instead of 1.
+
     """
 
     def __init__(self, *args, **kwargs) -> None:
-        """Args:
-        args: Passthrough arguments for standard dict.
-        kwargs: Passthrough keyword arguments for standard dict.
+        """Initialize from positional and keyword arguments forwarded to ``dict``.
+
+        Args:
+            args: Passthrough arguments for standard dict.
+            kwargs: Passthrough keyword arguments for standard dict.
+
         """
         self.__dict__["_mongo_dict_"] = dict(*args, **kwargs)
 
@@ -297,7 +301,8 @@ class MongoDict:
         return len(self._mongo_dict_)
 
     def __dir__(self) -> list:
-        """For Ipython tab completion.
+        """Return entries for IPython tab completion.
+
         See http://ipython.org/ipython-doc/dev/config/integrating.html.
         """
         return sorted(k for k in self._mongo_dict_ if not callable(k))
@@ -320,6 +325,7 @@ def dict2namedtuple(*args, **kwargs) -> tuple:
 
         - Don't use this function in code where memory and performance are
           crucial, since a dict is needed to instantiate the tuple!
+
     """
     dct = collections.OrderedDict(*args)
     dct.update(**kwargs)

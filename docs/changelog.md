@@ -1,5 +1,11 @@
 # Change log
 
+## 2026.5.18
+- Add Python 3.14 support (#768, @DanielYang59).
+- Optimize hot paths across `monty.json`, `monty.collections`, `monty.dev`, `monty.inspect`, and `monty.io` (#791).
+- Deprecate `monty.fractions.gcd`, `monty.fractions.lcm`, `monty.functools.nCr`, `monty.functools.nPr`, and `monty.string.is_string` in favor of stdlib equivalents.
+- Modernize type hints to PEP 585/604 and add return type annotations to public functions.
+
 ## 2026.2.18
 - Drop Python 3.9 and 3.10 support.
 - Deprecate `delete_removed_files` from `ScratchDir` (#762, @DanielYang59)

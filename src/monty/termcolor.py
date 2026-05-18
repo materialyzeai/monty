@@ -117,6 +117,7 @@ def colored(
     Examples:
         colored('Hello, World!', 'red', 'on_grey', ['blue', 'blink'])
         colored('Hello, World!', 'green')
+
     """
     if __ISON and os.getenv("ANSI_COLORS_DISABLED") is None:
         fmt_str = "\033[%dm%s"
@@ -165,12 +166,16 @@ def colored_map(text: str, cmap: dict) -> str:
 
 
 def cprint_map(text: str, cmap: dict, **kwargs) -> None:
-    """Print colorize text.
-    cmap is a dict mapping keys to color options.
-    kwargs are passed to print function.
+    """Print colorized text using a key→color mapping.
+
+    Args:
+        text: Text to print.
+        cmap: Mapping of substrings to color options.
+        **kwargs: Forwarded to ``print``.
 
     Examples:
-        cprint_map("Hello world", {"Hello": "red"})
+        >>> cprint_map("Hello world", {"Hello": "red"})
+
     """
     print(colored_map(text, cmap), **kwargs)
 
