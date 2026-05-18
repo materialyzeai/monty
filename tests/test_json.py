@@ -1494,10 +1494,12 @@ class TestTypeHandlerPlugin:
             "@class": "datetime",
             "string": "2024-01-02 03:04:05",
         }
-        assert MontyEncoder().default(pathlib.Path("/tmp/x")) == {
+        # ``str(Path)`` differs across platforms (POSIX vs. Windows separators).
+        # Use a no-separator filename so the expected value is portable.
+        assert MontyEncoder().default(pathlib.Path("scratch.txt")) == {
             "@module": "pathlib",
             "@class": "Path",
-            "string": "/tmp/x",
+            "string": "scratch.txt",
         }
         assert MontyEncoder().default(np.array([1, 2, 3]))["@module"] == "numpy"
 

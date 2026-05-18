@@ -1115,10 +1115,12 @@ class MontyDecoder(json.JSONDecoder):
                 modname = None
                 classname = None
 
-            if classname:
+            if classname and modname:
                 # Plugin dispatch: O(1) lookup keyed on ``(@module, @class)``.
                 # Covers datetime, uuid, pathlib, torch, numpy, pandas, pint,
-                # bson, and any user-registered handlers.
+                # bson, and any user-registered handlers. ``modname`` is only
+                # ever ``None`` when ``classname`` is too (see the branches
+                # above); the joint guard keeps mypy happy.
                 handler = _DECODER_HANDLERS.get((modname, classname))
                 if handler is not None:
                     try:
