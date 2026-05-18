@@ -15,13 +15,16 @@ from monty.json import (
     MontyDecoder,
     MontyEncoder,
     MSONable,
+    TypeHandler,
     _check_type,
     _load_redirect,
     jsanitize,
     load,
     load2dict,
     partial_monty_encode,
+    register,
     save,
+    unregister,
 )
 
 from . import __version__ as TESTS_VERSION
@@ -1395,3 +1398,112 @@ class TestCheckType:
             else:
                 assert v == reserialized[k]
             assert not isinstance(reserialized[k], dict)
+
+
+class _Color:
+    """Simple non-MSONable type used as a stand-in for a third-party class."""
+
+    def __init__(self, name: str) -> None:
+        self.name = name
+
+    def __eq__(self, other: object) -> bool:
+        return isinstance(other, _Color) and self.name == other.name
+
+
+class _ColorHandler(TypeHandler):
+    module = "tests.color"
+    class_name = "Color"
+
+    def matches(self, obj):
+        return isinstance(obj, _Color)
+
+    def encode(self, obj):
+        return {"@module": self.module, "@class": self.class_name, "name": obj.name}
+
+    def decode(self, d):
+        return _Color(d["name"])
+
+
+class HasColor(MSONable):
+    """Module-level MSONable wrapper for plugin nested-decode tests."""
+
+    def __init__(self, color: _Color):
+        self.color = color
+
+
+class TestTypeHandlerPlugin:
+    def setup_method(self):
+        self.handler = _ColorHandler()
+        register(self.handler)
+
+    def teardown_method(self):
+        unregister(self.handler)
+
+    def test_register_round_trip(self):
+        color = _Color("red")
+        encoded = json.dumps(color, cls=MontyEncoder)
+        # Encoder emits the handler's dict shape.
+        assert json.loads(encoded) == {
+            "@module": "tests.color",
+            "@class": "Color",
+            "name": "red",
+        }
+        decoded = json.loads(encoded, cls=MontyDecoder)
+        assert decoded == color
+        assert isinstance(decoded, _Color)
+
+    def test_unregister_removes_handler(self):
+        unregister(self.handler)
+        # After unregister, the encoder no longer knows how to serialize _Color.
+        with pytest.raises(TypeError, match="not JSON serializable"):
+            json.dumps(_Color("blue"), cls=MontyEncoder)
+        # Re-register so teardown's unregister is a no-op and the test is
+        # repeatable.
+        register(self.handler)
+
+    def test_re_register_replaces_previous(self):
+        class _ColorHandlerV2(TypeHandler):
+            module = "tests.color"
+            class_name = "Color"
+
+            def matches(self, obj):
+                return isinstance(obj, _Color)
+
+            def encode(self, obj):
+                return {
+                    "@module": self.module,
+                    "@class": self.class_name,
+                    "name": obj.name.upper(),
+                }
+
+            def decode(self, d):
+                return _Color(d["name"].lower())
+
+        v2 = _ColorHandlerV2()
+        register(v2)
+        try:
+            encoded = json.dumps(_Color("green"), cls=MontyEncoder)
+            assert json.loads(encoded)["name"] == "GREEN"
+        finally:
+            unregister(v2)
+
+    def test_builtin_dict_shapes_unchanged(self):
+        """Plugin refactor must preserve byte-identical JSON for built-ins."""
+        assert MontyEncoder().default(datetime.datetime(2024, 1, 2, 3, 4, 5)) == {
+            "@module": "datetime",
+            "@class": "datetime",
+            "string": "2024-01-02 03:04:05",
+        }
+        assert MontyEncoder().default(pathlib.Path("/tmp/x")) == {
+            "@module": "pathlib",
+            "@class": "Path",
+            "string": "/tmp/x",
+        }
+        assert MontyEncoder().default(np.array([1, 2, 3]))["@module"] == "numpy"
+
+    def test_nested_user_type_decodes_inside_msonable(self):
+        original = HasColor(_Color("teal"))
+        encoded = json.dumps(original.as_dict(), cls=MontyEncoder)
+        rebuilt = MontyDecoder().decode(encoded)
+        assert isinstance(rebuilt, HasColor)
+        assert rebuilt.color == _Color("teal")
