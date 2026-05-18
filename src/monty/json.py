@@ -239,6 +239,20 @@ class TypeHandler:
     module: str = ""
     class_name: str | tuple[str, ...] = ""
 
+    def decoder_keys(self) -> list[tuple[str, str]]:
+        """Return all ``(@module, @class)`` decoder keys this handler claims.
+
+        The default derives keys from the ``module`` and ``class_name``
+        attributes (the latter may be a tuple of names). Override when one
+        handler spans multiple ``@module`` namespaces — e.g. a merged bson
+        handler claiming both ``("bson.objectid", "ObjectId")`` and
+        ``("bson.dbref", "DBRef")``.
+        """
+        names = self.class_name
+        if isinstance(names, str):
+            names = (names,)
+        return [(self.module, n) for n in names]
+
     def matches(self, obj: Any) -> bool:
         """Return True if this handler should encode ``obj``."""
         raise NotImplementedError
@@ -286,10 +300,7 @@ def _rebuild_encoder_dispatch() -> None:
 
 def _handler_keys(handler: TypeHandler) -> list[tuple[str, str]]:
     """Return one ``(module, class_name)`` decoder key per name a handler claims."""
-    names = handler.class_name
-    if isinstance(names, str):
-        names = (names,)
-    return [(handler.module, n) for n in names]
+    return list(handler.decoder_keys())
 
 
 def register(handler: TypeHandler) -> None:
@@ -549,24 +560,79 @@ class PintQuantityHandler(TypeHandler):
         return ureg.Quantity(d["data"])
 
 
-class BsonObjectIdHandler(TypeHandler):
-    """Encode and decode ``bson.objectid.ObjectId`` (requires ``bson``)."""
+class BsonHandler(TypeHandler):
+    """Encode and decode ``bson.objectid.ObjectId`` and ``bson.dbref.DBRef``
+    (requires ``bson``).
 
-    module = "bson.objectid"
-    class_name = "ObjectId"
+    The two bson types share the same ``bson is not None`` gate and lazy
+    import strategy, so they live in one handler. Each emits its own
+    ``@module``/``@class`` keys so the decoder routes back to the correct
+    constructor.
+
+    DBRef is serialized with monty-style field names (``collection`` /
+    ``id`` / optional ``database`` / optional ``extras``) rather than
+    bson's extended-JSON convention (``$ref`` / ``$id`` / ``$db``). The
+    latter is recognised by ``bson.json_util`` and would be eagerly
+    constructed back into a DBRef during ``MontyDecoder.decode`` — before
+    our registry could route the nested ``id`` field through the decoder.
+    """
+
+    # ``decoder_keys`` is overridden below because the two types live in
+    # different ``@module`` namespaces; the inherited ``module`` /
+    # ``class_name`` attributes are intentionally left at their defaults.
+
+    def decoder_keys(self) -> list[tuple[str, str]]:
+        return [
+            ("bson.objectid", "ObjectId"),
+            ("bson.dbref", "DBRef"),
+        ]
 
     def matches(self, obj: Any) -> bool:
-        return bson is not None and isinstance(obj, bson.objectid.ObjectId)
+        if bson is None:
+            return False
+        return isinstance(obj, (bson.objectid.ObjectId, bson.dbref.DBRef))
 
     def encode(self, obj: Any) -> dict:
-        return {
-            "@module": "bson.objectid",
-            "@class": "ObjectId",
-            "oid": str(obj),
+        if isinstance(obj, bson.objectid.ObjectId):
+            return {
+                "@module": "bson.objectid",
+                "@class": "ObjectId",
+                "oid": str(obj),
+            }
+        # bson.dbref.DBRef. ``id`` may itself be an MSONable / ObjectId /
+        # etc.; we hand it back to the surrounding ``MontyEncoder`` so the
+        # full encode pipeline recurses into it as it walks the result dict.
+        d: dict[str, Any] = {
+            "@module": "bson.dbref",
+            "@class": "DBRef",
+            "collection": obj.collection,
+            "id": obj.id,
         }
+        if obj.database is not None:
+            d["database"] = obj.database
+        # DBRef supports arbitrary keyword extras; ``as_doc()`` exposes them
+        # under their user-supplied names alongside the bson ``$``-prefixed
+        # canonical fields. Drop the canonical ones to recover just extras.
+        extras = {
+            k: v for k, v in obj.as_doc().items() if k not in {"$ref", "$id", "$db"}
+        }
+        if extras:
+            d["extras"] = extras
+        return d
 
     def decode(self, d: dict) -> Any:
-        return bson.objectid.ObjectId(d["oid"])
+        if d["@class"] == "ObjectId":
+            return bson.objectid.ObjectId(d["oid"])
+        # DBRef: recurse through the decoder so a nested ObjectId (or any
+        # other handler-managed type) in ``id``/extras reconstructs.
+        decoder = MontyDecoder()
+        extras = {k: decoder.process_decoded(v) for k, v in d.get("extras", {}).items()}
+        return bson.dbref.DBRef(
+            collection=d["collection"],
+            id=decoder.process_decoded(d["id"]),
+            database=d.get("database"),
+            **extras,
+        )
 
 
 # Register built-ins in the order the legacy if/elif chain checked them.
@@ -579,7 +645,7 @@ _register_builtin(TorchTensorHandler())
 _register_builtin(NumpyHandler())
 _register_builtin(PandasHandler())
 _register_builtin(PintQuantityHandler())
-_register_builtin(BsonObjectIdHandler())
+_register_builtin(BsonHandler())
 
 
 class MSONable:
@@ -1218,9 +1284,9 @@ def jsanitize(
             the object to a string representation.  If "skip" is provided,
             jsanitize will skip and return the original object without modification.
         allow_bson (bool): This parameter sets the behavior when jsanitize
-            encounters a bson supported type such as objectid and datetime. If
-            True, such bson types will be ignored, allowing for proper
-            insertion into MongoDB databases.
+            encounters a bson supported type such as ObjectId, DBRef, or
+            datetime. If True, such bson types will be ignored, allowing
+            for proper insertion into MongoDB databases.
         enum_values (bool): Convert Enums to their values.
         recursive_msonable (bool): If True, uses .as_dict() for MSONables regardless
             of the value of strict.
@@ -1238,7 +1304,10 @@ def jsanitize(
 
     if allow_bson and (
         isinstance(obj, (datetime.datetime, bytes))
-        or (bson is not None and isinstance(obj, bson.objectid.ObjectId))
+        or (
+            bson is not None
+            and isinstance(obj, (bson.objectid.ObjectId, bson.dbref.DBRef))
+        )
     ):
         return obj
 

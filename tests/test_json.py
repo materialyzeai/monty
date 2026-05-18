@@ -55,6 +55,11 @@ except ImportError:
     ObjectId = None
 
 try:
+    from bson.dbref import DBRef
+except ImportError:
+    DBRef = None
+
+try:
     from bson import json_util
 except ImportError:
     json_util = None
@@ -837,6 +842,53 @@ class TestJson:
         djson = json.dumps(oid, cls=MontyEncoder)
         x = json.loads(djson, cls=MontyDecoder)
         assert isinstance(x, ObjectId)
+
+    @pytest.mark.skipif(DBRef is None, reason="bson not present")
+    def test_dbref(self):
+        ref = DBRef(
+            "my_collection",
+            ObjectId("562e8301218dcbbc3d7d91ce"),
+            database="my_database",
+            extra_field="extra_value",
+        )
+        # vanilla json can't serialize DBRef
+        with pytest.raises(TypeError):
+            json.dumps(ref)
+
+        djson = json.dumps(ref, cls=MontyEncoder)
+        encoded = json.loads(djson)
+        assert encoded["@module"] == "bson.dbref"
+        assert encoded["@class"] == "DBRef"
+        assert encoded["collection"] == "my_collection"
+        assert encoded["database"] == "my_database"
+        assert encoded["extras"] == {"extra_field": "extra_value"}
+
+        rebuilt = json.loads(djson, cls=MontyDecoder)
+        assert isinstance(rebuilt, DBRef)
+        assert rebuilt.collection == "my_collection"
+        assert rebuilt.database == "my_database"
+        assert rebuilt.extra_field == "extra_value"
+        # Nested ObjectId round-trips through MontyDecoder recursion.
+        assert isinstance(rebuilt.id, ObjectId)
+        assert rebuilt.id == ref.id
+
+    @pytest.mark.skipif(DBRef is None, reason="bson not present")
+    def test_dbref_no_database(self):
+        # ``database`` is optional on the wire and absent when not set.
+        ref = DBRef("collection", 42)
+        encoded = json.loads(json.dumps(ref, cls=MontyEncoder))
+        assert "database" not in encoded
+        assert "extras" not in encoded
+        rebuilt = json.loads(json.dumps(ref, cls=MontyEncoder), cls=MontyDecoder)
+        assert isinstance(rebuilt, DBRef)
+        assert rebuilt.database is None
+        assert rebuilt.id == 42
+
+    @pytest.mark.skipif(DBRef is None, reason="bson not present")
+    def test_dbref_jsanitize_allow_bson(self):
+        ref = DBRef("collection", 1)
+        # With allow_bson, DBRef passes through unchanged for direct MongoDB insertion.
+        assert jsanitize(ref, allow_bson=True) is ref
 
     def test_jsanitize(self):
         # clean_json should have no effect on None types.
