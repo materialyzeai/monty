@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, cast
 
+from monty.dev import deprecated
+
 if TYPE_CHECKING:
     from collections.abc import Iterable
     from typing import Any, Union
@@ -22,6 +24,7 @@ def remove_non_ascii(s: str) -> str:
     return "".join(i for i in s if ord(i) < 128)
 
 
+@deprecated(replacement="isinstance(s, str)", deadline=(2028, 1, 1))
 def is_string(s: Any) -> bool:
     """True if s is a string.
 

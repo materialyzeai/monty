@@ -5,10 +5,13 @@ from __future__ import annotations
 import math
 from typing import TYPE_CHECKING
 
+from monty.dev import deprecated
+
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
 
+@deprecated(replacement="math.gcd", deadline=(2028, 1, 1))
 def gcd(*numbers: int) -> int:
     """Returns the greatest common divisor for a sequence of numbers.
 
@@ -21,6 +24,7 @@ def gcd(*numbers: int) -> int:
     return math.gcd(*numbers)
 
 
+@deprecated(replacement="math.lcm", deadline=(2028, 1, 1))
 def lcm(*numbers: int) -> int:
     """Return lowest common multiple of a sequence of numbers.
 
