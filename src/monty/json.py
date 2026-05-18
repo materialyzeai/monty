@@ -273,6 +273,25 @@ class TypeHandler:
         """Reconstruct the live object from its dict representation."""
         raise NotImplementedError
 
+    def sanitize(self, obj: Any, recurse: Any, **opts: Any) -> Any:
+        """Return a JSON-native (flat) representation of ``obj`` for :func:`jsanitize`.
+
+        Default returns :data:`NotImplemented`, opting this handler out of
+        ``jsanitize`` dispatch — the generic resolver then handles ``obj``.
+        Override when the sanitized form should differ from :meth:`encode`'s
+        round-trippable envelope (e.g. ``PathHandler`` emits ``str(obj)`` here
+        but a ``{@module, @class, string}`` dict in ``encode``).
+
+        Args:
+            obj: The matched object.
+            recurse: Callable that recursively sanitizes a value with the
+                same options as the parent call. Use this for containers
+                whose elements may themselves be sanitize-eligible.
+            **opts: Forwarded :func:`jsanitize` options — currently
+                ``allow_bson`` and ``enum_values``.
+        """
+        return NotImplemented
+
 
 # Built-in handlers, checked first to preserve PR #791's hot-path order.
 _BUILTIN_HANDLERS: list[TypeHandler] = []
@@ -290,11 +309,20 @@ _DECODER_HANDLERS: dict[tuple[str, str], TypeHandler] = {}
 # user handler list changes; built-in pairs come first.
 _ENCODER_DISPATCH: tuple[tuple[Any, Any], ...] = ()
 
+# Parallel ``(matches, sanitize)`` pairs for the ``jsanitize`` hot path.
+# Only handlers that override the base ``sanitize`` participate, so
+# unsanitized types skip the dispatch loop entirely.
+_SANITIZE_DISPATCH: tuple[tuple[Any, Any], ...] = ()
+
 
 def _rebuild_encoder_dispatch() -> None:
-    global _ENCODER_DISPATCH  # noqa: PLW0603 — module-level dispatch tuple
-    _ENCODER_DISPATCH = tuple(
-        (h.matches, h.encode) for h in (*_BUILTIN_HANDLERS, *_USER_HANDLERS)
+    global _ENCODER_DISPATCH, _SANITIZE_DISPATCH  # noqa: PLW0603
+    handlers = (*_BUILTIN_HANDLERS, *_USER_HANDLERS)
+    _ENCODER_DISPATCH = tuple((h.matches, h.encode) for h in handlers)
+    _SANITIZE_DISPATCH = tuple(
+        (h.matches, h.sanitize)
+        for h in handlers
+        if type(h).sanitize is not TypeHandler.sanitize
     )
 
 
@@ -379,6 +407,13 @@ class DatetimeHandler(TypeHandler):
             except ValueError:
                 return datetime.datetime.strptime(s, "%Y-%m-%d %H:%M:%S")
 
+    def sanitize(self, obj: Any, recurse: Any, **opts: Any) -> Any:
+        # ``allow_bson`` keeps datetime intact so it can be inserted into
+        # MongoDB, which has native BSON datetime support.
+        if opts.get("allow_bson"):
+            return obj
+        return str(obj)
+
 
 class UUIDHandler(TypeHandler):
     """Encode and decode :class:`uuid.UUID` instances."""
@@ -395,6 +430,9 @@ class UUIDHandler(TypeHandler):
     def decode(self, d: dict) -> Any:
         return UUID(d["string"])
 
+    def sanitize(self, obj: Any, recurse: Any, **opts: Any) -> Any:
+        return str(obj)
+
 
 class PathHandler(TypeHandler):
     """Encode and decode :class:`pathlib.Path` instances."""
@@ -410,6 +448,9 @@ class PathHandler(TypeHandler):
 
     def decode(self, d: dict) -> Any:
         return Path(d["string"])
+
+    def sanitize(self, obj: Any, recurse: Any, **opts: Any) -> Any:
+        return str(obj)
 
 
 class TorchTensorHandler(TypeHandler):
@@ -498,6 +539,18 @@ class NumpyHandler(TypeHandler):
             )
         return np.array(d["data"], dtype=d["dtype"])
 
+    def sanitize(self, obj: Any, recurse: Any, **opts: Any) -> Any:
+        if isinstance(obj, np.generic):
+            return obj.item()
+        # ndarray: recurse into the python-list form so nested non-JSON-native
+        # values (datetimes, objects) get sanitized too. ``tolist`` can fail
+        # for object-dtype arrays containing unhashable items; in that case
+        # fall back to the raw ``tolist`` output without recursion.
+        try:
+            return [recurse(i) for i in obj.tolist()]
+        except TypeError:
+            return obj.tolist()
+
 
 class PandasHandler(TypeHandler):
     """Encode and decode ``pandas.DataFrame`` / ``Series`` (lazy ``pandas`` import).
@@ -534,6 +587,9 @@ class PandasHandler(TypeHandler):
 
         pd_cls = pd.DataFrame if d["@class"] == "DataFrame" else pd.Series
         return pd_cls(MontyDecoder().decode(d["data"]))
+
+    def sanitize(self, obj: Any, recurse: Any, **opts: Any) -> Any:
+        return obj.to_dict()
 
 
 class PintQuantityHandler(TypeHandler):
@@ -633,6 +689,15 @@ class BsonHandler(TypeHandler):
             database=d.get("database"),
             **extras,
         )
+
+    def sanitize(self, obj: Any, recurse: Any, **opts: Any) -> Any:
+        # Keep bson types unmodified when ``allow_bson`` so they go straight
+        # into MongoDB as native types. Otherwise opt out and let
+        # ``jsanitize``'s strict/strict=False fallthrough decide (str() or
+        # AttributeError).
+        if opts.get("allow_bson"):
+            return obj
+        return NotImplemented
 
 
 # Register built-ins in the order the legacy if/elif chain checked them.
@@ -1274,6 +1339,11 @@ def jsanitize(
     Walks lists/dicts (nested or otherwise), converts non-string dict keys to
     strings, and recursively encodes objects via Monty's ``as_dict`` protocol.
 
+    Type-specific conversion (datetime, pathlib, numpy, pandas, bson, …) is
+    delegated to :class:`TypeHandler` plugins that override ``sanitize`` —
+    the same registry that drives :class:`MontyEncoder`. Custom handlers
+    registered via :func:`register` automatically participate.
+
     Args:
         obj: input json-like object.
         strict (bool): This parameter sets the behavior when jsanitize
@@ -1295,6 +1365,42 @@ def jsanitize(
         Sanitized dict that can be json serialized.
 
     """
+    # Fast path: native JSON-compatible primitives. Pulled to the front
+    # because they dominate leaf counts in MSONable graphs from pymatgen /
+    # matgl / matcalc — bypassing the Enum / handler-dispatch loop here
+    # recovers the per-leaf cost of the plugin registry. Exact-type checks
+    # (not isinstance) so ``np.float64`` / ``IntEnum`` still route to their
+    # registered handlers / the Enum branch below.
+    t = type(obj)
+    if t is int or t is float or t is bool or t is str or obj is None:
+        return obj
+
+    # Common containers via exact-type check, before Enum / handler dispatch.
+    # ``dict`` / ``list`` / ``tuple`` subclasses (AttrDict, OrderedDict,
+    # frozendict, …) fall through to the isinstance fallbacks below.
+    if t is dict:
+        return {
+            str(k): jsanitize(
+                v,
+                strict=strict,
+                allow_bson=allow_bson,
+                enum_values=enum_values,
+                recursive_msonable=recursive_msonable,
+            )
+            for k, v in obj.items()
+        }
+    if t is list or t is tuple:
+        return [
+            jsanitize(
+                i,
+                strict=strict,
+                allow_bson=allow_bson,
+                enum_values=enum_values,
+                recursive_msonable=recursive_msonable,
+            )
+            for i in obj
+        ]
+
     if isinstance(obj, Enum):
         if enum_values:
             return obj.value
@@ -1302,15 +1408,45 @@ def jsanitize(
             return obj.as_dict()
         return MontyEncoder().default(obj)
 
-    if allow_bson and (
-        isinstance(obj, (datetime.datetime, bytes))
-        or (
-            bson is not None
-            and isinstance(obj, (bson.objectid.ObjectId, bson.dbref.DBRef))
-        )
-    ):
+    # ``bytes`` is the only allow_bson short-circuit that isn't already a
+    # registered handler (datetime / ObjectId / DBRef are).
+    if allow_bson and isinstance(obj, bytes):
         return obj
 
+    # Plugin dispatch — datetime, pathlib, numpy, pandas, uuid, bson + any
+    # user-registered handlers that override ``sanitize``. The ``recurse``
+    # closure threads the current options through nested calls.
+    if _SANITIZE_DISPATCH:
+
+        def recurse(v: Any) -> Any:
+            return jsanitize(
+                v,
+                strict=strict,
+                allow_bson=allow_bson,
+                enum_values=enum_values,
+                recursive_msonable=recursive_msonable,
+            )
+
+        for matches, sanitize in _SANITIZE_DISPATCH:
+            if matches(obj):
+                result = sanitize(
+                    obj, recurse, allow_bson=allow_bson, enum_values=enum_values
+                )
+                if result is not NotImplemented:
+                    return result
+
+    # Container-subclass fallbacks for the exact-type fast paths above.
+    if isinstance(obj, dict):
+        return {
+            str(k): jsanitize(
+                v,
+                strict=strict,
+                allow_bson=allow_bson,
+                enum_values=enum_values,
+                recursive_msonable=recursive_msonable,
+            )
+            for k, v in obj.items()
+        }
     if isinstance(obj, (list, tuple)):
         return [
             jsanitize(
@@ -1323,57 +1459,9 @@ def jsanitize(
             for i in obj
         ]
 
-    if isinstance(obj, np.ndarray):
-        try:
-            return [
-                jsanitize(
-                    i,
-                    strict=strict,
-                    allow_bson=allow_bson,
-                    enum_values=enum_values,
-                    recursive_msonable=recursive_msonable,
-                )
-                for i in obj.tolist()
-            ]
-        except TypeError:
-            return obj.tolist()
-
-    if isinstance(obj, np.generic):
-        return obj.item()
-
-    # Fast path: skip the pandas type-check entirely if pandas isn't loaded.
-    if "pandas" in sys.modules and _check_type(
-        obj,
-        (
-            "pandas.core.series.Series",
-            "pandas.Series",
-            "pandas.core.frame.DataFrame",
-            "pandas.DataFrame",
-            "pandas.core.base.PandasObject",
-        ),
-    ):
-        return obj.to_dict()
-
-    if isinstance(obj, dict):
-        return {
-            str(k): jsanitize(
-                v,
-                strict=strict,
-                allow_bson=allow_bson,
-                enum_values=enum_values,
-                recursive_msonable=recursive_msonable,
-            )
-            for k, v in obj.items()
-        }
-
+    # Numeric subclasses not picked up by a handler.
     if isinstance(obj, (int, float)):
         return obj
-
-    if obj is None:
-        return None
-
-    if isinstance(obj, (pathlib.Path, datetime.datetime)):
-        return str(obj)
 
     if callable(obj) and not isinstance(obj, MSONable):
         try:
