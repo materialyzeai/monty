@@ -3,6 +3,8 @@
 ## 2026.5.18
 - Add Python 3.14 support (#768, @DanielYang59).
 - Optimize hot paths across `monty.json`, `monty.collections`, `monty.dev`, `monty.inspect`, and `monty.io` (#791).
+- Introduce `monty.json.TypeHandler` + `register`/`unregister` plugin API so third-party packages can teach `MontyEncoder`/`MontyDecoder` about custom types without forking. Built-in types (datetime, uuid, pathlib, numpy, torch, pandas, pint, bson) are migrated to handlers with identical dict shapes.
+- Add serialization support for `bson.dbref.DBRef` (collection, id, optional database, optional extras; nested ids recurse through `MontyDecoder`). Closes #746, @mkhorton.
 - Deprecate `monty.fractions.gcd`, `monty.fractions.lcm`, `monty.functools.nCr`, `monty.functools.nPr`, and `monty.string.is_string` in favor of stdlib equivalents.
 - Modernize type hints to PEP 585/604 and add return type annotations to public functions.
 

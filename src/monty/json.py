@@ -197,6 +197,457 @@ def _recursive_as_dict(obj):
     return obj
 
 
+# ---------------------------------------------------------------------------
+# Type handler plugin registry
+# ---------------------------------------------------------------------------
+
+
+class TypeHandler:
+    """Plugin protocol for encoding and decoding a single external type.
+
+    Subclasses set ``module`` and ``class_name`` class attributes (used for
+    decoder dispatch and for the ``@module``/``@class`` keys of the emitted
+    JSON dict) and implement :meth:`matches`, :meth:`encode`, and
+    :meth:`decode`. ``class_name`` may be a tuple of strings when one
+    handler covers more than one ``@class`` value (e.g. pandas DataFrame
+    + Series); ``encode`` is then responsible for picking the right
+    ``@class`` per object.
+
+    Register custom handlers via :func:`register`. Built-in handlers for
+    ``datetime``, ``uuid``, ``pathlib.Path``, ``numpy.ndarray``,
+    ``torch.Tensor``, ``pandas.DataFrame``/``Series``, ``pint.Quantity``,
+    and ``bson.ObjectId`` are registered at import time and are always
+    checked first; user handlers run after.
+
+    Examples:
+        >>> class MyHandler(TypeHandler):
+        ...     module = "mypkg"
+        ...     class_name = "MyType"
+        ...
+        ...     def matches(self, obj):
+        ...         return isinstance(obj, MyType)
+        ...
+        ...     def encode(self, obj):
+        ...         return {"@module": "mypkg", "@class": "MyType", "value": obj.value}
+        ...
+        ...     def decode(self, d):
+        ...         return MyType(d["value"])
+        ...
+        >>> register(MyHandler())
+    """
+
+    module: str = ""
+    class_name: str | tuple[str, ...] = ""
+
+    def decoder_keys(self) -> list[tuple[str, str]]:
+        """Return all ``(@module, @class)`` decoder keys this handler claims.
+
+        The default derives keys from the ``module`` and ``class_name``
+        attributes (the latter may be a tuple of names). Override when one
+        handler spans multiple ``@module`` namespaces — e.g. a merged bson
+        handler claiming both ``("bson.objectid", "ObjectId")`` and
+        ``("bson.dbref", "DBRef")``.
+        """
+        names = self.class_name
+        if isinstance(names, str):
+            names = (names,)
+        return [(self.module, n) for n in names]
+
+    def matches(self, obj: Any) -> bool:
+        """Return True if this handler should encode ``obj``."""
+        raise NotImplementedError
+
+    def encode(self, obj: Any) -> Any:
+        """Return the JSON-compatible representation of ``obj``.
+
+        Typically a dict carrying ``@module``, ``@class``, and type-specific
+        fields. May also return a JSON-native primitive (int/float/bool/
+        str/None) for types that collapse to a scalar on the wire (e.g.
+        numpy scalars). Primitives are not reconstructed by the decoder's
+        ``@module``/``@class`` dispatch — the standard JSON parser handles
+        them on the way back.
+        """
+        raise NotImplementedError
+
+    def decode(self, d: dict) -> Any:
+        """Reconstruct the live object from its dict representation."""
+        raise NotImplementedError
+
+
+# Built-in handlers, checked first to preserve PR #791's hot-path order.
+_BUILTIN_HANDLERS: list[TypeHandler] = []
+
+# User-registered handlers, checked after the built-ins.
+_USER_HANDLERS: list[TypeHandler] = []
+
+# (module, class_name) -> handler for O(1) decoder dispatch.
+_DECODER_HANDLERS: dict[tuple[str, str], TypeHandler] = {}
+
+# Pre-bound ``(matches, encode)`` callable pairs for the encoder hot path.
+# Iterating bound methods directly avoids the attribute-lookup cost of
+# ``h.matches(obj)`` / ``h.encode(obj)`` per dispatch and recovers most of
+# the perf delta vs. the legacy inline if/elif chain. Rebuilt whenever the
+# user handler list changes; built-in pairs come first.
+_ENCODER_DISPATCH: tuple[tuple[Any, Any], ...] = ()
+
+
+def _rebuild_encoder_dispatch() -> None:
+    global _ENCODER_DISPATCH  # noqa: PLW0603 — module-level dispatch tuple
+    _ENCODER_DISPATCH = tuple(
+        (h.matches, h.encode) for h in (*_BUILTIN_HANDLERS, *_USER_HANDLERS)
+    )
+
+
+def _handler_keys(handler: TypeHandler) -> list[tuple[str, str]]:
+    """Return one ``(module, class_name)`` decoder key per name a handler claims."""
+    return list(handler.decoder_keys())
+
+
+def register(handler: TypeHandler) -> None:
+    """Register a custom :class:`TypeHandler` with the JSON registry.
+
+    The handler's ``encode(obj)`` is invoked when ``MontyEncoder`` encounters
+    an instance for which ``handler.matches(obj)`` returns True. The
+    ``decode(d)`` method is dispatched on the ``@module``/``@class`` keys
+    of the incoming dict.
+
+    A handler may claim multiple ``@class`` names by setting ``class_name``
+    to a tuple — every entry is registered as its own decoder key.
+    Re-registering for any of those keys replaces the previous registration.
+    """
+    keys = _handler_keys(handler)
+    for key in keys:
+        existing = _DECODER_HANDLERS.get(key)
+        if existing is not None and existing in _USER_HANDLERS:
+            _USER_HANDLERS.remove(existing)
+    if handler not in _USER_HANDLERS:
+        _USER_HANDLERS.append(handler)
+    for key in keys:
+        _DECODER_HANDLERS[key] = handler
+    _rebuild_encoder_dispatch()
+
+
+def unregister(handler: TypeHandler) -> None:
+    """Remove a previously-registered user handler."""
+    if handler in _USER_HANDLERS:
+        _USER_HANDLERS.remove(handler)
+    for key in _handler_keys(handler):
+        if _DECODER_HANDLERS.get(key) is handler:
+            del _DECODER_HANDLERS[key]
+    _rebuild_encoder_dispatch()
+
+
+def _register_builtin(handler: TypeHandler) -> None:
+    _BUILTIN_HANDLERS.append(handler)
+    for key in _handler_keys(handler):
+        _DECODER_HANDLERS[key] = handler
+    _rebuild_encoder_dispatch()
+
+
+# ---------------------------------------------------------------------------
+# Built-in type handlers
+# ---------------------------------------------------------------------------
+
+
+class DatetimeHandler(TypeHandler):
+    """Encode and decode :class:`datetime.datetime` instances."""
+
+    module = "datetime"
+    class_name = "datetime"
+
+    def matches(self, obj: Any) -> bool:
+        return isinstance(obj, datetime.datetime)
+
+    def encode(self, obj: Any) -> dict:
+        return {
+            "@module": "datetime",
+            "@class": "datetime",
+            "string": str(obj),
+        }
+
+    def decode(self, d: dict) -> Any:
+        s = d["string"]
+        try:
+            # ``fromisoformat`` is ~5x faster than ``strptime`` and handles
+            # fractional seconds and ``+HH:MM`` timezone suffixes natively.
+            return datetime.datetime.fromisoformat(s)
+        except ValueError:
+            # Fall back to the legacy parser for non-ISO inputs.
+            s = s.split("+")[0]
+            try:
+                return datetime.datetime.strptime(s, "%Y-%m-%d %H:%M:%S.%f")
+            except ValueError:
+                return datetime.datetime.strptime(s, "%Y-%m-%d %H:%M:%S")
+
+
+class UUIDHandler(TypeHandler):
+    """Encode and decode :class:`uuid.UUID` instances."""
+
+    module = "uuid"
+    class_name = "UUID"
+
+    def matches(self, obj: Any) -> bool:
+        return isinstance(obj, UUID)
+
+    def encode(self, obj: Any) -> dict:
+        return {"@module": "uuid", "@class": "UUID", "string": str(obj)}
+
+    def decode(self, d: dict) -> Any:
+        return UUID(d["string"])
+
+
+class PathHandler(TypeHandler):
+    """Encode and decode :class:`pathlib.Path` instances."""
+
+    module = "pathlib"
+    class_name = "Path"
+
+    def matches(self, obj: Any) -> bool:
+        return isinstance(obj, Path)
+
+    def encode(self, obj: Any) -> dict:
+        return {"@module": "pathlib", "@class": "Path", "string": str(obj)}
+
+    def decode(self, d: dict) -> Any:
+        return Path(d["string"])
+
+
+class TorchTensorHandler(TypeHandler):
+    """Encode and decode ``torch.Tensor`` (lazy ``torch`` import)."""
+
+    module = "torch"
+    class_name = "Tensor"
+
+    def matches(self, obj: Any) -> bool:
+        # ``sys.modules`` gate skips the (cached but non-free) MRO scan when
+        # torch hasn't been imported yet — see PR #791.
+        return "torch" in sys.modules and _check_type(obj, "torch.Tensor")
+
+    def encode(self, obj: Any) -> dict:
+        d: dict[str, Any] = {
+            "@module": "torch",
+            "@class": "Tensor",
+            "dtype": obj.type(),
+            "size": list(obj.size()),
+        }
+        if "Complex" in obj.type():
+            d["data"] = [obj.real.tolist(), obj.imag.tolist()]
+        else:
+            d["data"] = obj.numpy().tolist()
+        return d
+
+    def decode(self, d: dict) -> Any:
+        import torch  # heavy import deferred until first decode
+
+        if "Complex" in d["dtype"]:
+            if "size" in d and d["data"] == [[], []]:
+                return torch.empty(d["size"]).type(d["dtype"])
+            return torch.tensor(
+                [
+                    np.array(r) + np.array(i) * 1j
+                    for r, i in zip(*d["data"], strict=True)
+                ],
+            ).type(d["dtype"])
+        if "size" in d and d["data"] == []:
+            return torch.empty(d["size"]).type(d["dtype"])
+        return torch.tensor(d["data"]).type(d["dtype"])
+
+
+class NumpyHandler(TypeHandler):
+    """Encode and decode numpy arrays and scalars.
+
+    ``np.ndarray`` round-trips through the ``@module``/``@class`` envelope;
+    ``np.generic`` scalars collapse to native Python primitives on the
+    wire (decoded by stdlib ``json``).
+    """
+
+    module = "numpy"
+    class_name = "array"
+
+    def matches(self, obj: Any) -> bool:
+        # Match both ndarray and scalar in one branch so the order of
+        # operations between them lives entirely inside ``encode``.
+        return isinstance(obj, (np.ndarray, np.generic))
+
+    def encode(self, obj: Any) -> Any:
+        # Numpy scalars collapse to a JSON-native primitive — no envelope.
+        if isinstance(obj, np.generic):
+            return obj.item()
+        if str(obj.dtype).startswith("complex"):
+            return {
+                "@module": "numpy",
+                "@class": "array",
+                "dtype": str(obj.dtype),
+                "data": [obj.real.tolist(), obj.imag.tolist()],
+            }
+        return {
+            "@module": "numpy",
+            "@class": "array",
+            "dtype": str(obj.dtype),
+            "data": obj.tolist(),
+        }
+
+    def decode(self, d: dict) -> Any:
+        if d["dtype"].startswith("complex"):
+            return np.array(
+                [
+                    np.array(r) + np.array(i) * 1j
+                    for r, i in zip(*d["data"], strict=True)
+                ],
+                dtype=d["dtype"],
+            )
+        return np.array(d["data"], dtype=d["dtype"])
+
+
+class PandasHandler(TypeHandler):
+    """Encode and decode ``pandas.DataFrame`` / ``Series`` (lazy ``pandas`` import).
+
+    A single handler covers both because they share the same encoding shape
+    (``to_json`` payload). The emitted ``@class`` is ``"DataFrame"`` or
+    ``"Series"`` depending on the concrete object so the decoder can pick
+    the right pandas constructor.
+    """
+
+    module = "pandas"
+    class_name = ("DataFrame", "Series")
+
+    # Qualified names matched by ``_check_type``. DataFrame's are listed
+    # first so ``encode`` can discriminate without re-walking the MRO.
+    _DF_QUALNAMES = ("pandas.core.frame.DataFrame", "pandas.DataFrame")
+    _SERIES_QUALNAMES = ("pandas.core.series.Series", "pandas.Series")
+
+    def matches(self, obj: Any) -> bool:
+        return "pandas" in sys.modules and _check_type(
+            obj, self._DF_QUALNAMES + self._SERIES_QUALNAMES
+        )
+
+    def encode(self, obj: Any) -> dict:
+        cls_name = "DataFrame" if _check_type(obj, self._DF_QUALNAMES) else "Series"
+        return {
+            "@module": "pandas",
+            "@class": cls_name,
+            "data": obj.to_json(default_handler=MontyEncoder().encode),
+        }
+
+    def decode(self, d: dict) -> Any:
+        import pandas as pd
+
+        pd_cls = pd.DataFrame if d["@class"] == "DataFrame" else pd.Series
+        return pd_cls(MontyDecoder().decode(d["data"]))
+
+
+class PintQuantityHandler(TypeHandler):
+    """Encode and decode ``pint.Quantity`` (lazy ``pint`` import)."""
+
+    module = "pint"
+    class_name = "Quantity"
+
+    def matches(self, obj: Any) -> bool:
+        return "pint" in sys.modules and _check_type(obj, "pint.Quantity")
+
+    def encode(self, obj: Any) -> dict:
+        return {
+            "@module": "pint",
+            "@class": "Quantity",
+            "data": str(obj),
+            "@version": _module_version("pint"),
+        }
+
+    def decode(self, d: dict) -> Any:
+        from pint import UnitRegistry
+
+        ureg = UnitRegistry()
+        return ureg.Quantity(d["data"])
+
+
+class BsonHandler(TypeHandler):
+    """Encode and decode ``bson.objectid.ObjectId`` and ``bson.dbref.DBRef``
+    (requires ``bson``).
+
+    The two bson types share the same ``bson is not None`` gate and lazy
+    import strategy, so they live in one handler. Each emits its own
+    ``@module``/``@class`` keys so the decoder routes back to the correct
+    constructor.
+
+    DBRef is serialized with monty-style field names (``collection`` /
+    ``id`` / optional ``database`` / optional ``extras``) rather than
+    bson's extended-JSON convention (``$ref`` / ``$id`` / ``$db``). The
+    latter is recognised by ``bson.json_util`` and would be eagerly
+    constructed back into a DBRef during ``MontyDecoder.decode`` — before
+    our registry could route the nested ``id`` field through the decoder.
+    """
+
+    # ``decoder_keys`` is overridden below because the two types live in
+    # different ``@module`` namespaces; the inherited ``module`` /
+    # ``class_name`` attributes are intentionally left at their defaults.
+
+    def decoder_keys(self) -> list[tuple[str, str]]:
+        return [
+            ("bson.objectid", "ObjectId"),
+            ("bson.dbref", "DBRef"),
+        ]
+
+    def matches(self, obj: Any) -> bool:
+        if bson is None:
+            return False
+        return isinstance(obj, (bson.objectid.ObjectId, bson.dbref.DBRef))
+
+    def encode(self, obj: Any) -> dict:
+        if isinstance(obj, bson.objectid.ObjectId):
+            return {
+                "@module": "bson.objectid",
+                "@class": "ObjectId",
+                "oid": str(obj),
+            }
+        # bson.dbref.DBRef. ``id`` may itself be an MSONable / ObjectId /
+        # etc.; we hand it back to the surrounding ``MontyEncoder`` so the
+        # full encode pipeline recurses into it as it walks the result dict.
+        d: dict[str, Any] = {
+            "@module": "bson.dbref",
+            "@class": "DBRef",
+            "collection": obj.collection,
+            "id": obj.id,
+        }
+        if obj.database is not None:
+            d["database"] = obj.database
+        # DBRef supports arbitrary keyword extras; ``as_doc()`` exposes them
+        # under their user-supplied names alongside the bson ``$``-prefixed
+        # canonical fields. Drop the canonical ones to recover just extras.
+        extras = {
+            k: v for k, v in obj.as_doc().items() if k not in {"$ref", "$id", "$db"}
+        }
+        if extras:
+            d["extras"] = extras
+        return d
+
+    def decode(self, d: dict) -> Any:
+        if d["@class"] == "ObjectId":
+            return bson.objectid.ObjectId(d["oid"])
+        # DBRef: recurse through the decoder so a nested ObjectId (or any
+        # other handler-managed type) in ``id``/extras reconstructs.
+        decoder = MontyDecoder()
+        extras = {k: decoder.process_decoded(v) for k, v in d.get("extras", {}).items()}
+        return bson.dbref.DBRef(
+            collection=d["collection"],
+            id=decoder.process_decoded(d["id"]),
+            database=d.get("database"),
+            **extras,
+        )
+
+
+# Register built-ins in the order the legacy if/elif chain checked them.
+# Ordering is load-bearing for performance (see PR #791): cheap isinstance
+# checks first, then ``sys.modules``-gated qualified-name matches.
+_register_builtin(DatetimeHandler())
+_register_builtin(UUIDHandler())
+_register_builtin(PathHandler())
+_register_builtin(TorchTensorHandler())
+_register_builtin(NumpyHandler())
+_register_builtin(PandasHandler())
+_register_builtin(PintQuantityHandler())
+_register_builtin(BsonHandler())
+
+
 class MSONable:
     """Mix-in base class specifying an API for msonable objects.
 
@@ -608,95 +1059,31 @@ class MontyEncoder(json.JSONEncoder):
         self._name_object_map[name] = o
         return {"@object_reference": name}
 
-    def default(self, o) -> dict:
+    def default(self, o) -> Any:
         """Encode an object for JSON serialization.
 
-        If the object has an ``as_dict`` method, its output is used and
-        ``@module``/``@class`` keys are added automatically if missing. Falls
-        back to ``json.JSONEncoder.default`` otherwise.
+        Type-specific handling is delegated to :class:`TypeHandler` plugins
+        registered via :func:`register` (built-in handlers cover datetime,
+        uuid, pathlib, numpy, torch, pandas, pint, bson). The fallback
+        chain dispatches on pydantic / non-MSONable dataclass / MSONable
+        ``as_dict`` / ``Enum`` in that order and injects ``@module``,
+        ``@class``, and ``@version`` keys when they are missing.
 
         Args:
             o: Python object.
 
         Returns:
-            Python dict representation.
-
+            A JSON-compatible value — typically a dict with ``@module`` and
+            ``@class`` keys, but may also be a JSON-native primitive (e.g.
+            for numpy scalars).
         """
-        if isinstance(o, datetime.datetime):
-            return {
-                "@module": "datetime",
-                "@class": "datetime",
-                "string": str(o),
-            }
-        if isinstance(o, UUID):
-            return {"@module": "uuid", "@class": "UUID", "string": str(o)}
-        if isinstance(o, Path):
-            return {"@module": "pathlib", "@class": "Path", "string": str(o)}
-
-        # Support for Pytorch Tensors. Skip the (cached but still nonzero)
-        # ``_check_type`` call entirely when torch is not loaded.
-        if "torch" in sys.modules and _check_type(o, "torch.Tensor"):
-            d: dict[str, Any] = {
-                "@module": "torch",
-                "@class": "Tensor",
-                "dtype": o.type(),
-                "size": list(o.size()),
-            }
-            if "Complex" in o.type():
-                d["data"] = [o.real.tolist(), o.imag.tolist()]
-            else:
-                d["data"] = o.numpy().tolist()
-            return d
-
-        if isinstance(o, np.ndarray):
-            if str(o.dtype).startswith("complex"):
-                return {
-                    "@module": "numpy",
-                    "@class": "array",
-                    "dtype": str(o.dtype),
-                    "data": [o.real.tolist(), o.imag.tolist()],
-                }
-            return {
-                "@module": "numpy",
-                "@class": "array",
-                "dtype": str(o.dtype),
-                "data": o.tolist(),
-            }
-
-        if isinstance(o, np.generic):
-            return o.item()
-
-        if "pandas" in sys.modules and _check_type(
-            o, ("pandas.core.frame.DataFrame", "pandas.DataFrame")
-        ):
-            return {
-                "@module": "pandas",
-                "@class": "DataFrame",
-                "data": o.to_json(default_handler=MontyEncoder().encode),
-            }
-        if "pandas" in sys.modules and _check_type(
-            o, ("pandas.core.series.Series", "pandas.Series")
-        ):
-            return {
-                "@module": "pandas",
-                "@class": "Series",
-                "data": o.to_json(default_handler=MontyEncoder().encode),
-            }
-
-        if "pint" in sys.modules and _check_type(o, "pint.Quantity"):
-            return {
-                "@module": "pint",
-                "@class": "Quantity",
-                "data": str(o),
-                "@version": _module_version("pint"),
-            }
-
-        if bson is not None and isinstance(o, bson.objectid.ObjectId):
-            return {
-                "@module": "bson.objectid",
-                "@class": "ObjectId",
-                "oid": str(o),
-            }
+        # Plugin dispatch (datetime, uuid, pathlib, numpy, torch, pandas,
+        # pint, bson + any user-registered handlers). The tuple holds
+        # pre-bound ``(matches, encode)`` pairs to avoid per-iteration
+        # attribute lookups.
+        for matches, encode in _ENCODER_DISPATCH:
+            if matches(o):
+                return encode(o)
 
         if callable(o) and not isinstance(o, MSONable):
             try:
@@ -760,6 +1147,8 @@ class MontyDecoder(json.JSONDecoder):
     def process_decoded(self, d: Any) -> Any:
         """Recursively decode dicts and lists containing MSONable objects."""
         if isinstance(d, dict):
+            modname: str | None
+            classname: str | None
             if "@module" in d and "@class" in d:
                 modname = d["@module"]
                 classname = d["@class"]
@@ -796,39 +1185,23 @@ class MontyDecoder(json.JSONDecoder):
                 modname = None
                 classname = None
 
-            if classname:
-                if modname and modname not in {
-                    "bson.objectid",
-                    "numpy",
-                    "pandas",
-                    "pint",
-                    "torch",
-                }:
-                    if modname == "datetime" and classname == "datetime":
-                        s = d["string"]
-                        try:
-                            # ``fromisoformat`` is ~5x faster than ``strptime``
-                            # and handles the optional fractional seconds and
-                            # ``+HH:MM`` timezone suffix natively.
-                            return datetime.datetime.fromisoformat(s)
-                        except ValueError:
-                            # Fall back to the legacy parser for non-ISO inputs.
-                            s = s.split("+")[0]
-                            try:
-                                return datetime.datetime.strptime(
-                                    s, "%Y-%m-%d %H:%M:%S.%f"
-                                )
-                            except ValueError:
-                                return datetime.datetime.strptime(
-                                    s, "%Y-%m-%d %H:%M:%S"
-                                )
-
-                    if modname == "uuid" and classname == "UUID":
-                        return UUID(d["string"])
-
-                    if modname == "pathlib" and classname == "Path":
-                        return Path(d["string"])
-
+            if classname and modname:
+                # Plugin dispatch: O(1) lookup keyed on ``(@module, @class)``.
+                # Covers datetime, uuid, pathlib, torch, numpy, pandas, pint,
+                # bson, and any user-registered handlers. ``modname`` is only
+                # ever ``None`` when ``classname`` is too (see the branches
+                # above); the joint guard keeps mypy happy.
+                handler = _DECODER_HANDLERS.get((modname, classname))
+                if handler is not None:
+                    try:
+                        return handler.decode(d)
+                    except ImportError:
+                        # Optional decoder dependency missing (e.g. torch).
+                        # Fall through to the generic resolver / raw dict.
+                        pass
+                else:
+                    # Generic class resolution for MSONable / Enum / pydantic /
+                    # non-MSONable dataclass classes.
                     cls_ = _resolve_class(modname, classname)
                     if cls_ is not None:
                         data = {k: v for k, v in d.items() if not k.startswith("@")}
@@ -851,63 +1224,6 @@ class MontyDecoder(json.JSONDecoder):
                         ) and dataclasses.is_dataclass(cls_):
                             d = {k: self.process_decoded(v) for k, v in data.items()}
                             return cls_(**d)  # type: ignore[operator]
-
-                elif modname == "torch" and classname == "Tensor":
-                    try:
-                        import torch  # import torch is very expensive
-
-                        if "Complex" in d["dtype"]:
-                            if "size" in d and d["data"] == [[], []]:
-                                return torch.empty(d["size"]).type(d["dtype"])
-
-                            return torch.tensor(
-                                [
-                                    np.array(r) + np.array(i) * 1j
-                                    for r, i in zip(*d["data"], strict=True)
-                                ],
-                            ).type(d["dtype"])
-
-                        if "size" in d and d["data"] == []:
-                            return torch.empty(d["size"]).type(d["dtype"])
-
-                        return torch.tensor(d["data"]).type(d["dtype"])
-
-                    except ImportError:
-                        pass
-
-                elif modname == "numpy" and classname == "array":
-                    if d["dtype"].startswith("complex"):
-                        return np.array(
-                            [
-                                np.array(r) + np.array(i) * 1j
-                                for r, i in zip(*d["data"], strict=True)
-                            ],
-                            dtype=d["dtype"],
-                        )
-                    return np.array(d["data"], dtype=d["dtype"])
-
-                elif modname == "pandas":
-                    import pandas as pd
-
-                    if classname == "DataFrame":
-                        return pd.DataFrame(self.decode(d["data"]))
-                    if classname == "Series":
-                        return pd.Series(self.decode(d["data"]))
-
-                elif modname == "pint":
-                    from pint import UnitRegistry
-
-                    ureg = UnitRegistry()
-
-                    if classname == "Quantity":
-                        return ureg.Quantity(d["data"])
-
-                elif (
-                    (bson is not None)
-                    and modname == "bson.objectid"
-                    and classname == "ObjectId"
-                ):
-                    return bson.objectid.ObjectId(d["oid"])
 
             return {
                 self.process_decoded(k): self.process_decoded(v) for k, v in d.items()
@@ -968,9 +1284,9 @@ def jsanitize(
             the object to a string representation.  If "skip" is provided,
             jsanitize will skip and return the original object without modification.
         allow_bson (bool): This parameter sets the behavior when jsanitize
-            encounters a bson supported type such as objectid and datetime. If
-            True, such bson types will be ignored, allowing for proper
-            insertion into MongoDB databases.
+            encounters a bson supported type such as ObjectId, DBRef, or
+            datetime. If True, such bson types will be ignored, allowing
+            for proper insertion into MongoDB databases.
         enum_values (bool): Convert Enums to their values.
         recursive_msonable (bool): If True, uses .as_dict() for MSONables regardless
             of the value of strict.
@@ -988,7 +1304,10 @@ def jsanitize(
 
     if allow_bson and (
         isinstance(obj, (datetime.datetime, bytes))
-        or (bson is not None and isinstance(obj, bson.objectid.ObjectId))
+        or (
+            bson is not None
+            and isinstance(obj, (bson.objectid.ObjectId, bson.dbref.DBRef))
+        )
     ):
         return obj
 

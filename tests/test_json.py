@@ -15,13 +15,16 @@ from monty.json import (
     MontyDecoder,
     MontyEncoder,
     MSONable,
+    TypeHandler,
     _check_type,
     _load_redirect,
     jsanitize,
     load,
     load2dict,
     partial_monty_encode,
+    register,
     save,
+    unregister,
 )
 
 from . import __version__ as TESTS_VERSION
@@ -50,6 +53,11 @@ try:
     from bson.objectid import ObjectId
 except ImportError:
     ObjectId = None
+
+try:
+    from bson.dbref import DBRef
+except ImportError:
+    DBRef = None
 
 try:
     from bson import json_util
@@ -835,6 +843,53 @@ class TestJson:
         x = json.loads(djson, cls=MontyDecoder)
         assert isinstance(x, ObjectId)
 
+    @pytest.mark.skipif(DBRef is None, reason="bson not present")
+    def test_dbref(self):
+        ref = DBRef(
+            "my_collection",
+            ObjectId("562e8301218dcbbc3d7d91ce"),
+            database="my_database",
+            extra_field="extra_value",
+        )
+        # vanilla json can't serialize DBRef
+        with pytest.raises(TypeError):
+            json.dumps(ref)
+
+        djson = json.dumps(ref, cls=MontyEncoder)
+        encoded = json.loads(djson)
+        assert encoded["@module"] == "bson.dbref"
+        assert encoded["@class"] == "DBRef"
+        assert encoded["collection"] == "my_collection"
+        assert encoded["database"] == "my_database"
+        assert encoded["extras"] == {"extra_field": "extra_value"}
+
+        rebuilt = json.loads(djson, cls=MontyDecoder)
+        assert isinstance(rebuilt, DBRef)
+        assert rebuilt.collection == "my_collection"
+        assert rebuilt.database == "my_database"
+        assert rebuilt.extra_field == "extra_value"
+        # Nested ObjectId round-trips through MontyDecoder recursion.
+        assert isinstance(rebuilt.id, ObjectId)
+        assert rebuilt.id == ref.id
+
+    @pytest.mark.skipif(DBRef is None, reason="bson not present")
+    def test_dbref_no_database(self):
+        # ``database`` is optional on the wire and absent when not set.
+        ref = DBRef("collection", 42)
+        encoded = json.loads(json.dumps(ref, cls=MontyEncoder))
+        assert "database" not in encoded
+        assert "extras" not in encoded
+        rebuilt = json.loads(json.dumps(ref, cls=MontyEncoder), cls=MontyDecoder)
+        assert isinstance(rebuilt, DBRef)
+        assert rebuilt.database is None
+        assert rebuilt.id == 42
+
+    @pytest.mark.skipif(DBRef is None, reason="bson not present")
+    def test_dbref_jsanitize_allow_bson(self):
+        ref = DBRef("collection", 1)
+        # With allow_bson, DBRef passes through unchanged for direct MongoDB insertion.
+        assert jsanitize(ref, allow_bson=True) is ref
+
     def test_jsanitize(self):
         # clean_json should have no effect on None types.
         d = {"hello": 1, "world": None}
@@ -1395,3 +1450,163 @@ class TestCheckType:
             else:
                 assert v == reserialized[k]
             assert not isinstance(reserialized[k], dict)
+
+
+class _Color:
+    """Simple non-MSONable type used as a stand-in for a third-party class."""
+
+    def __init__(self, name: str) -> None:
+        self.name = name
+
+    def __eq__(self, other: object) -> bool:
+        return isinstance(other, _Color) and self.name == other.name
+
+
+class _ColorHandler(TypeHandler):
+    module = "tests.color"
+    class_name = "Color"
+
+    def matches(self, obj):
+        return isinstance(obj, _Color)
+
+    def encode(self, obj):
+        return {"@module": self.module, "@class": self.class_name, "name": obj.name}
+
+    def decode(self, d):
+        return _Color(d["name"])
+
+
+class HasColor(MSONable):
+    """Module-level MSONable wrapper for plugin nested-decode tests."""
+
+    def __init__(self, color: _Color):
+        self.color = color
+
+
+class TestTypeHandlerPlugin:
+    def setup_method(self):
+        self.handler = _ColorHandler()
+        register(self.handler)
+
+    def teardown_method(self):
+        unregister(self.handler)
+
+    def test_register_round_trip(self):
+        color = _Color("red")
+        encoded = json.dumps(color, cls=MontyEncoder)
+        # Encoder emits the handler's dict shape.
+        assert json.loads(encoded) == {
+            "@module": "tests.color",
+            "@class": "Color",
+            "name": "red",
+        }
+        decoded = json.loads(encoded, cls=MontyDecoder)
+        assert decoded == color
+        assert isinstance(decoded, _Color)
+
+    def test_unregister_removes_handler(self):
+        unregister(self.handler)
+        # After unregister, the encoder no longer knows how to serialize _Color.
+        with pytest.raises(TypeError, match="not JSON serializable"):
+            json.dumps(_Color("blue"), cls=MontyEncoder)
+        # Re-register so teardown's unregister is a no-op and the test is
+        # repeatable.
+        register(self.handler)
+
+    def test_re_register_replaces_previous(self):
+        class _ColorHandlerV2(TypeHandler):
+            module = "tests.color"
+            class_name = "Color"
+
+            def matches(self, obj):
+                return isinstance(obj, _Color)
+
+            def encode(self, obj):
+                return {
+                    "@module": self.module,
+                    "@class": self.class_name,
+                    "name": obj.name.upper(),
+                }
+
+            def decode(self, d):
+                return _Color(d["name"].lower())
+
+        v2 = _ColorHandlerV2()
+        register(v2)
+        try:
+            encoded = json.dumps(_Color("green"), cls=MontyEncoder)
+            assert json.loads(encoded)["name"] == "GREEN"
+        finally:
+            unregister(v2)
+
+    def test_builtin_dict_shapes_unchanged(self):
+        """Plugin refactor must preserve byte-identical JSON for built-ins."""
+        assert MontyEncoder().default(datetime.datetime(2024, 1, 2, 3, 4, 5)) == {
+            "@module": "datetime",
+            "@class": "datetime",
+            "string": "2024-01-02 03:04:05",
+        }
+        # ``str(Path)`` differs across platforms (POSIX vs. Windows separators).
+        # Use a no-separator filename so the expected value is portable.
+        assert MontyEncoder().default(pathlib.Path("scratch.txt")) == {
+            "@module": "pathlib",
+            "@class": "Path",
+            "string": "scratch.txt",
+        }
+        assert MontyEncoder().default(np.array([1, 2, 3]))["@module"] == "numpy"
+
+    def test_handler_with_multiple_class_names(self):
+        """A handler that claims multiple ``@class`` names registers each
+        as its own decoder key and discriminates inside ``encode``.
+        """
+
+        class _Shape:
+            def __init__(self, name: str) -> None:
+                self.name = name
+
+            def __eq__(self, other: object) -> bool:
+                return isinstance(other, type(self)) and self.name == other.name
+
+        class _Circle(_Shape):
+            pass
+
+        class _Square(_Shape):
+            pass
+
+        class _ShapeHandler(TypeHandler):
+            module = "tests.shape"
+            class_name = ("Circle", "Square")
+
+            def matches(self, obj):
+                return isinstance(obj, (_Circle, _Square))
+
+            def encode(self, obj):
+                return {
+                    "@module": self.module,
+                    "@class": "Circle" if isinstance(obj, _Circle) else "Square",
+                    "name": obj.name,
+                }
+
+            def decode(self, d):
+                cls = _Circle if d["@class"] == "Circle" else _Square
+                return cls(d["name"])
+
+        handler = _ShapeHandler()
+        register(handler)
+        try:
+            c, s = _Circle("c1"), _Square("s1")
+            enc_c = json.loads(json.dumps(c, cls=MontyEncoder))
+            enc_s = json.loads(json.dumps(s, cls=MontyEncoder))
+            assert enc_c["@class"] == "Circle"
+            assert enc_s["@class"] == "Square"
+            assert MontyDecoder().decode(json.dumps(c, cls=MontyEncoder)) == c
+            assert MontyDecoder().decode(json.dumps(s, cls=MontyEncoder)) == s
+        finally:
+            unregister(handler)
+
+    def test_nested_user_type_decodes_inside_msonable(self):
+        original = HasColor(_Color("teal"))
+        encoded = json.dumps(original.as_dict(), cls=MontyEncoder)
+        rebuilt = MontyDecoder().decode(encoded)
+        assert isinstance(rebuilt, HasColor)
+        assert rebuilt.color == _Color("teal")
