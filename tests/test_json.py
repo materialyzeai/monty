@@ -1503,6 +1503,55 @@ class TestTypeHandlerPlugin:
         }
         assert MontyEncoder().default(np.array([1, 2, 3]))["@module"] == "numpy"
 
+    def test_handler_with_multiple_class_names(self):
+        """A handler that claims multiple ``@class`` names registers each
+        as its own decoder key and discriminates inside ``encode``.
+        """
+
+        class _Shape:
+            def __init__(self, name: str) -> None:
+                self.name = name
+
+            def __eq__(self, other: object) -> bool:
+                return isinstance(other, type(self)) and self.name == other.name
+
+        class _Circle(_Shape):
+            pass
+
+        class _Square(_Shape):
+            pass
+
+        class _ShapeHandler(TypeHandler):
+            module = "tests.shape"
+            class_name = ("Circle", "Square")
+
+            def matches(self, obj):
+                return isinstance(obj, (_Circle, _Square))
+
+            def encode(self, obj):
+                return {
+                    "@module": self.module,
+                    "@class": "Circle" if isinstance(obj, _Circle) else "Square",
+                    "name": obj.name,
+                }
+
+            def decode(self, d):
+                cls = _Circle if d["@class"] == "Circle" else _Square
+                return cls(d["name"])
+
+        handler = _ShapeHandler()
+        register(handler)
+        try:
+            c, s = _Circle("c1"), _Square("s1")
+            enc_c = json.loads(json.dumps(c, cls=MontyEncoder))
+            enc_s = json.loads(json.dumps(s, cls=MontyEncoder))
+            assert enc_c["@class"] == "Circle"
+            assert enc_s["@class"] == "Square"
+            assert MontyDecoder().decode(json.dumps(c, cls=MontyEncoder)) == c
+            assert MontyDecoder().decode(json.dumps(s, cls=MontyEncoder)) == s
+        finally:
+            unregister(handler)
+
     def test_nested_user_type_decodes_inside_msonable(self):
         original = HasColor(_Color("teal"))
         encoded = json.dumps(original.as_dict(), cls=MontyEncoder)

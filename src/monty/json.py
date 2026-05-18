@@ -208,7 +208,10 @@ class TypeHandler:
     Subclasses set ``module`` and ``class_name`` class attributes (used for
     decoder dispatch and for the ``@module``/``@class`` keys of the emitted
     JSON dict) and implement :meth:`matches`, :meth:`encode`, and
-    :meth:`decode`.
+    :meth:`decode`. ``class_name`` may be a tuple of strings when one
+    handler covers more than one ``@class`` value (e.g. pandas DataFrame
+    + Series); ``encode`` is then responsible for picking the right
+    ``@class`` per object.
 
     Register custom handlers via :func:`register`. Built-in handlers for
     ``datetime``, ``uuid``, ``pathlib.Path``, ``numpy.ndarray``,
@@ -234,7 +237,7 @@ class TypeHandler:
     """
 
     module: str = ""
-    class_name: str = ""
+    class_name: str | tuple[str, ...] = ""
 
     def matches(self, obj: Any) -> bool:
         """Return True if this handler should encode ``obj``."""
@@ -281,6 +284,14 @@ def _rebuild_encoder_dispatch() -> None:
     )
 
 
+def _handler_keys(handler: TypeHandler) -> list[tuple[str, str]]:
+    """Return one ``(module, class_name)`` decoder key per name a handler claims."""
+    names = handler.class_name
+    if isinstance(names, str):
+        names = (names,)
+    return [(handler.module, n) for n in names]
+
+
 def register(handler: TypeHandler) -> None:
     """Register a custom :class:`TypeHandler` with the JSON registry.
 
@@ -289,15 +300,19 @@ def register(handler: TypeHandler) -> None:
     ``decode(d)`` method is dispatched on the ``@module``/``@class`` keys
     of the incoming dict.
 
-    Re-registering a handler for the same ``(module, class_name)`` pair
-    replaces the previous registration.
+    A handler may claim multiple ``@class`` names by setting ``class_name``
+    to a tuple — every entry is registered as its own decoder key.
+    Re-registering for any of those keys replaces the previous registration.
     """
-    key = (handler.module, handler.class_name)
-    existing = _DECODER_HANDLERS.get(key)
-    if existing is not None and existing in _USER_HANDLERS:
-        _USER_HANDLERS.remove(existing)
-    _USER_HANDLERS.append(handler)
-    _DECODER_HANDLERS[key] = handler
+    keys = _handler_keys(handler)
+    for key in keys:
+        existing = _DECODER_HANDLERS.get(key)
+        if existing is not None and existing in _USER_HANDLERS:
+            _USER_HANDLERS.remove(existing)
+    if handler not in _USER_HANDLERS:
+        _USER_HANDLERS.append(handler)
+    for key in keys:
+        _DECODER_HANDLERS[key] = handler
     _rebuild_encoder_dispatch()
 
 
@@ -305,15 +320,16 @@ def unregister(handler: TypeHandler) -> None:
     """Remove a previously-registered user handler."""
     if handler in _USER_HANDLERS:
         _USER_HANDLERS.remove(handler)
-    key = (handler.module, handler.class_name)
-    if _DECODER_HANDLERS.get(key) is handler:
-        del _DECODER_HANDLERS[key]
+    for key in _handler_keys(handler):
+        if _DECODER_HANDLERS.get(key) is handler:
+            del _DECODER_HANDLERS[key]
     _rebuild_encoder_dispatch()
 
 
 def _register_builtin(handler: TypeHandler) -> None:
     _BUILTIN_HANDLERS.append(handler)
-    _DECODER_HANDLERS[(handler.module, handler.class_name)] = handler
+    for key in _handler_keys(handler):
+        _DECODER_HANDLERS[key] = handler
     _rebuild_encoder_dispatch()
 
 
@@ -472,52 +488,41 @@ class NumpyHandler(TypeHandler):
         return np.array(d["data"], dtype=d["dtype"])
 
 
-class PandasDataFrameHandler(TypeHandler):
-    """Encode and decode ``pandas.DataFrame`` (lazy ``pandas`` import)."""
+class PandasHandler(TypeHandler):
+    """Encode and decode ``pandas.DataFrame`` / ``Series`` (lazy ``pandas`` import).
+
+    A single handler covers both because they share the same encoding shape
+    (``to_json`` payload). The emitted ``@class`` is ``"DataFrame"`` or
+    ``"Series"`` depending on the concrete object so the decoder can pick
+    the right pandas constructor.
+    """
 
     module = "pandas"
-    class_name = "DataFrame"
+    class_name = ("DataFrame", "Series")
+
+    # Qualified names matched by ``_check_type``. DataFrame's are listed
+    # first so ``encode`` can discriminate without re-walking the MRO.
+    _DF_QUALNAMES = ("pandas.core.frame.DataFrame", "pandas.DataFrame")
+    _SERIES_QUALNAMES = ("pandas.core.series.Series", "pandas.Series")
 
     def matches(self, obj: Any) -> bool:
         return "pandas" in sys.modules and _check_type(
-            obj, ("pandas.core.frame.DataFrame", "pandas.DataFrame")
+            obj, self._DF_QUALNAMES + self._SERIES_QUALNAMES
         )
 
     def encode(self, obj: Any) -> dict:
+        cls_name = "DataFrame" if _check_type(obj, self._DF_QUALNAMES) else "Series"
         return {
             "@module": "pandas",
-            "@class": "DataFrame",
+            "@class": cls_name,
             "data": obj.to_json(default_handler=MontyEncoder().encode),
         }
 
     def decode(self, d: dict) -> Any:
         import pandas as pd
 
-        return pd.DataFrame(MontyDecoder().decode(d["data"]))
-
-
-class PandasSeriesHandler(TypeHandler):
-    """Encode and decode ``pandas.Series`` (lazy ``pandas`` import)."""
-
-    module = "pandas"
-    class_name = "Series"
-
-    def matches(self, obj: Any) -> bool:
-        return "pandas" in sys.modules and _check_type(
-            obj, ("pandas.core.series.Series", "pandas.Series")
-        )
-
-    def encode(self, obj: Any) -> dict:
-        return {
-            "@module": "pandas",
-            "@class": "Series",
-            "data": obj.to_json(default_handler=MontyEncoder().encode),
-        }
-
-    def decode(self, d: dict) -> Any:
-        import pandas as pd
-
-        return pd.Series(MontyDecoder().decode(d["data"]))
+        pd_cls = pd.DataFrame if d["@class"] == "DataFrame" else pd.Series
+        return pd_cls(MontyDecoder().decode(d["data"]))
 
 
 class PintQuantityHandler(TypeHandler):
@@ -572,8 +577,7 @@ _register_builtin(UUIDHandler())
 _register_builtin(PathHandler())
 _register_builtin(TorchTensorHandler())
 _register_builtin(NumpyHandler())
-_register_builtin(PandasDataFrameHandler())
-_register_builtin(PandasSeriesHandler())
+_register_builtin(PandasHandler())
 _register_builtin(PintQuantityHandler())
 _register_builtin(BsonObjectIdHandler())
 
