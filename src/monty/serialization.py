@@ -4,12 +4,13 @@ from __future__ import annotations
 
 import json
 import os
+import pathlib
 from typing import TYPE_CHECKING, Literal, TextIO, cast
 
 from ruamel.yaml import YAML
 
 from monty.io import zopen
-from monty.json import MontyDecoder, MontyEncoder
+from monty.json import MontyDecoder, MontyEncoder, MSONable
 from monty.msgpack import default, object_hook
 
 try:
@@ -28,6 +29,47 @@ _FILE_TYPE = Literal["json", "jsonl", "yaml", "mpk"]
 # A single ``YAML()`` instance is reusable across calls and avoids per-call
 # construction cost (the constructor walks ruamel.yaml resolver tables).
 _YAML = YAML()
+
+# Bridge the JSON ``TypeHandler`` plugin registry into ruamel.yaml so MSONable
+# subclasses and every registered handler type (numpy, pandas, pint, torch,
+# uuid, bson, user-registered) round-trip through ``dumpfn`` / ``loadfn`` the
+# same way they do via JSON. ruamel.yaml retains its native rendering for
+# types it already supports (datetime, set, OrderedDict, bytes, primitives).
+_MONTY_ENCODER = MontyEncoder()
+
+
+def _represent_via_monty(representer: Any, data: Any) -> Any:
+    """Encode ``data`` via :class:`MontyEncoder` and represent the result.
+
+    Used as a ruamel.yaml multi-representer for ``MSONable`` / ``PurePath``
+    and as the fallback for the ``None``-keyed dispatch slot (replacing
+    ``represent_undefined``). The encoder returns a JSON-compatible value —
+    typically a dict with ``@module``/``@class`` — which ruamel.yaml then
+    represents recursively, so nested non-native types route through the
+    same hook.
+    """
+    return representer.represent_data(_MONTY_ENCODER.default(data))
+
+
+_YAML.representer.add_multi_representer(MSONable, _represent_via_monty)
+# Paths would otherwise hit ruamel.yaml's default ``str(obj)`` fallback,
+# which is lossy on load. Route them through the PathHandler envelope.
+_YAML.representer.add_multi_representer(pathlib.PurePath, _represent_via_monty)
+# Replace the ``None`` slot — invoked when neither yaml_representers nor
+# yaml_multi_representers match — with a hook that tries MontyEncoder first,
+# falling back to the original ``represent_undefined`` (which raises
+# ``RepresenterError``) if MontyEncoder cannot serialize the object either.
+_ORIG_REPRESENT_UNDEFINED = _YAML.representer.yaml_representers[None]
+
+
+def _represent_undefined(representer: Any, data: Any) -> Any:
+    try:
+        return _represent_via_monty(representer, data)
+    except TypeError:
+        return _ORIG_REPRESENT_UNDEFINED(representer, data)
+
+
+_YAML.representer.yaml_representers[None] = _represent_undefined
 
 
 def _identify_format(file_name: str | Path) -> _FILE_TYPE:
@@ -96,7 +138,15 @@ def loadfn(
             if fmt == "yaml":
                 if YAML is None:
                     raise RuntimeError("Loading of YAML files requires ruamel.yaml.")
-                return _YAML.load(fp, *args, **kwargs)
+                # ``cls`` is a monty-level kwarg (not ruamel.yaml's) — pop it
+                # before forwarding so ``_YAML.load`` doesn't choke. Passing
+                # ``cls=None`` opts out of MSONable reconstruction, matching
+                # the JSON path's escape hatch.
+                cls = kwargs.pop("cls", MontyDecoder)
+                loaded = _YAML.load(fp, *args, **kwargs)
+                if cls is not None:
+                    loaded = MontyDecoder().process_decoded(loaded)
+                return loaded
 
             if fmt in {"json", "jsonl"}:
                 if "cls" not in kwargs:
