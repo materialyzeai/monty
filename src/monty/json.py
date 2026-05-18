@@ -4,10 +4,12 @@ from __future__ import annotations
 
 import dataclasses
 import datetime
+import functools
 import json
 import os
 import pathlib
 import pickle
+import sys
 import traceback
 import types
 from collections import OrderedDict, defaultdict
@@ -20,7 +22,6 @@ from typing import TYPE_CHECKING
 from uuid import UUID, uuid4
 
 import numpy as np
-from ruamel.yaml import YAML
 
 if TYPE_CHECKING:
     from typing import Any
@@ -28,22 +29,107 @@ if TYPE_CHECKING:
 try:
     import bson
     from bson import json_util
+
+    _BSON_JSON_OPTIONS = json_util.JSONOptions(tz_aware=True)  # type: ignore[no-untyped-call]
 except ImportError:
-    bson = None
-    json_util = None
+    bson = None  # type: ignore[assignment]
+    json_util = None  # type: ignore[assignment]
+    _BSON_JSON_OPTIONS = None  # type: ignore[assignment]
 
 __version__ = "3.0.0"
 
 
-def _load_redirect(redirect_file) -> dict:
+# ---------------------------------------------------------------------------
+# Cached helpers (perf hot paths)
+# ---------------------------------------------------------------------------
+
+
+@functools.cache
+def _init_spec(cls: type):
+    """Cache ``getfullargspec(cls.__init__)`` — typically the dominant cost
+    of ``MSONable.as_dict``.
+    """
+    return getfullargspec(cls.__init__)  # type: ignore[misc]
+
+
+@functools.cache
+def _module_version(modname: str) -> str | None:
+    """Cache the ``__version__`` lookup for a top-level module name.
+
+    ``MSONable.as_dict`` and ``MontyEncoder.default`` both call this per
+    encoded object; the result is determined entirely by the module name.
+    """
     try:
-        with open(redirect_file, encoding="utf-8") as f:
-            yaml = YAML()
-            d = yaml.load(f)
+        return str(import_module(modname).__version__)
+    except (AttributeError, ImportError):
+        return None
+
+
+@functools.cache
+def _resolve_class(modname: str, classname: str) -> type | None:
+    """Cache ``__import__`` + ``getattr`` of a class by ``(module, name)``.
+
+    ``ImportError`` is intentionally *not* swallowed — callers (notably the
+    redirect path) rely on it surfacing when a redirect points at a missing
+    module.
+    """
+    mod = __import__(modname, globals(), locals(), [classname], 0)
+    return getattr(mod, classname, None)
+
+
+_TYPE_STR_CACHE: dict[tuple[type, tuple[str, ...]], bool] = {}
+
+
+def _type_str_match(tp: type, type_strs: tuple[str, ...]) -> bool:
+    """Return whether ``tp.mro()`` contains any of the qualified names in
+    ``type_strs``. Result is cached per ``(type, type_strs)`` pair — most
+    callers query the same handful of strings against the same type
+    repeatedly (torch.Tensor, pandas.DataFrame, etc.).
+    """
+    key = (tp, type_strs)
+    cached = _TYPE_STR_CACHE.get(key)
+    if cached is not None:
+        return cached
+    result = any(
+        f"{o.__module__}.{o.__qualname__}" == ts for o in tp.mro() for ts in type_strs
+    )
+    _TYPE_STR_CACHE[key] = result
+    return result
+
+
+class _LazyRedirect:
+    """Class-level descriptor that loads ``~/.monty.yaml`` lazily on first
+    access. Avoids paying the ``ruamel.yaml`` import + filesystem stat cost
+    on every ``import monty.json`` (which is on the import path of pymatgen,
+    matgl, matcalc, etc.)."""
+
+    def __init__(self) -> None:
+        self._value: dict | None = None
+
+    def __get__(self, instance, owner) -> dict:
+        if self._value is None:
+            self._value = _load_redirect(
+                os.path.join(os.path.expanduser("~"), ".monty.yaml")
+            )
+        return self._value
+
+    def __set__(self, instance, value) -> None:
+        # Allow overriding (e.g. for tests).
+        self._value = value
+
+
+def _load_redirect(redirect_file) -> dict:
+    # Defer the heavy ruamel.yaml import until we actually need to parse a
+    # redirect file. This avoids pulling YAML in on every ``import monty.json``.
+    try:
+        f = open(redirect_file, encoding="utf-8")
     except OSError:
-        # If we can't find the file
-        # Just use an empty redirect dict
         return {}
+
+    with f:
+        from ruamel.yaml import YAML  # local import — cold path
+
+        d = YAML().load(f)
 
     # Convert the full paths to module/class
     redirect_dict: dict = defaultdict(dict)
@@ -92,11 +178,29 @@ def _check_type(obj: object, type_str: tuple[str, ...] | str) -> bool:
     if isclass(obj):
         return False
 
-    type_str = type_str if isinstance(type_str, tuple) else (type_str,)
+    type_strs = type_str if isinstance(type_str, tuple) else (type_str,)
+    return _type_str_match(type(obj), type_strs)
 
-    mro = type(obj).mro()
 
-    return any(f"{o.__module__}.{o.__qualname__}" == ts for o in mro for ts in type_str)
+def _recursive_as_dict(obj):
+    """Recursive helper for ``MSONable.as_dict`` — kept at module level so it
+    is not re-created on every ``as_dict`` invocation."""
+    if isinstance(obj, (list, tuple)):
+        return [_recursive_as_dict(it) for it in obj]
+    if isinstance(obj, dict):
+        return {kk: _recursive_as_dict(vv) for kk, vv in obj.items()}
+    if hasattr(obj, "as_dict"):
+        return obj.as_dict()
+    if dataclasses.is_dataclass(obj):
+        d = dataclasses.asdict(obj)
+        d.update(
+            {
+                "@module": obj.__class__.__module__,
+                "@class": obj.__class__.__name__,
+            }
+        )
+        return d
+    return obj
 
 
 class MSONable:
@@ -140,41 +244,22 @@ class MSONable:
     old_module.old_class: new_module.new_class
     """
 
-    REDIRECT = _load_redirect(os.path.join(os.path.expanduser("~"), ".monty.yaml"))
+    # Backwards-compatible class attribute. The redirect file is loaded the
+    # first time it is accessed via the ``_LazyRedirect`` descriptor.
+    REDIRECT = _LazyRedirect()
 
     def as_dict(self) -> dict:
         """A JSON serializable dict representation of an object."""
+        cls = self.__class__
         d: dict[str, Any] = {
-            "@module": self.__class__.__module__,
-            "@class": self.__class__.__name__,
+            "@module": cls.__module__,
+            "@class": cls.__name__,
         }
 
-        try:
-            parent_module = self.__class__.__module__.split(".", maxsplit=1)[0]
-            module_version = import_module(parent_module).__version__
-            d["@version"] = str(module_version)
-        except (AttributeError, ImportError):
-            d["@version"] = None
+        parent_module = cls.__module__.partition(".")[0]
+        d["@version"] = _module_version(parent_module)
 
-        spec = getfullargspec(self.__class__.__init__)
-
-        def recursive_as_dict(obj):
-            if isinstance(obj, (list, tuple)):
-                return [recursive_as_dict(it) for it in obj]
-            if isinstance(obj, dict):
-                return {kk: recursive_as_dict(vv) for kk, vv in obj.items()}
-            if hasattr(obj, "as_dict"):
-                return obj.as_dict()
-            if dataclasses is not None and dataclasses.is_dataclass(obj):
-                d = dataclasses.asdict(obj)
-                d.update(
-                    {
-                        "@module": obj.__class__.__module__,
-                        "@class": obj.__class__.__name__,
-                    }
-                )
-                return d
-            return obj
+        spec = _init_spec(cls)  # type: ignore[arg-type]
 
         for c in spec.args + spec.kwonlyargs:
             if c != "self":
@@ -193,7 +278,7 @@ class MSONable:
                             "determine the dict format. Alternatively, "
                             "you can implement both as_dict and from_dict."
                         ) from exc
-                d[c] = recursive_as_dict(a)
+                d[c] = _recursive_as_dict(a)
         if hasattr(self, "kwargs"):
             d.update(**self.kwargs)
         if spec.varargs is not None and getattr(self, spec.varargs, None) is not None:
@@ -214,8 +299,10 @@ class MSONable:
         Returns:
             MSONable class.
         """
+        # Reuse a single module-level decoder rather than allocating a new
+        # ``MontyDecoder`` for every key, which used to dominate this path.
         decoded = {
-            k: MontyDecoder().process_decoded(v)
+            k: _SHARED_DECODER.process_decoded(v)
             for k, v in d.items()
             if not k.startswith("@")
         }
@@ -577,8 +664,9 @@ class MontyEncoder(json.JSONEncoder):
         if isinstance(o, Path):
             return {"@module": "pathlib", "@class": "Path", "string": str(o)}
 
-        # Support for Pytorch Tensors
-        if _check_type(o, "torch.Tensor"):
+        # Support for Pytorch Tensors. Skip the (cached but still nonzero)
+        # ``_check_type`` call entirely when torch is not loaded.
+        if "torch" in sys.modules and _check_type(o, "torch.Tensor"):
             d: dict[str, Any] = {
                 "@module": "torch",
                 "@class": "Tensor",
@@ -609,31 +697,30 @@ class MontyEncoder(json.JSONEncoder):
         if isinstance(o, np.generic):
             return o.item()
 
-        if _check_type(o, ("pandas.core.frame.DataFrame", "pandas.DataFrame")):
+        if "pandas" in sys.modules and _check_type(
+            o, ("pandas.core.frame.DataFrame", "pandas.DataFrame")
+        ):
             return {
                 "@module": "pandas",
                 "@class": "DataFrame",
                 "data": o.to_json(default_handler=MontyEncoder().encode),
             }
-        if _check_type(o, ("pandas.core.series.Series", "pandas.Series")):
+        if "pandas" in sys.modules and _check_type(
+            o, ("pandas.core.series.Series", "pandas.Series")
+        ):
             return {
                 "@module": "pandas",
                 "@class": "Series",
                 "data": o.to_json(default_handler=MontyEncoder().encode),
             }
 
-        if _check_type(o, "pint.Quantity"):
-            d = {
+        if "pint" in sys.modules and _check_type(o, "pint.Quantity"):
+            return {
                 "@module": "pint",
                 "@class": "Quantity",
                 "data": str(o),
+                "@version": _module_version("pint"),
             }
-            try:
-                module_version = import_module("pint").__version__
-                d["@version"] = str(module_version)
-            except (AttributeError, ImportError):
-                d["@version"] = None
-            return d
 
         if bson is not None and isinstance(o, bson.objectid.ObjectId):
             return {
@@ -652,7 +739,7 @@ class MontyEncoder(json.JSONEncoder):
                 raise AttributeError(e) from e
 
         try:
-            if _check_type(o, "pydantic.main.BaseModel"):
+            if "pydantic" in sys.modules and _check_type(o, "pydantic.main.BaseModel"):
                 d = o.model_dump()
             elif (
                 dataclasses is not None
@@ -680,12 +767,9 @@ class MontyEncoder(json.JSONEncoder):
             if "@class" not in d:
                 d["@class"] = str(o.__class__.__name__)
             if "@version" not in d:
-                try:
-                    parent_module = o.__class__.__module__.split(".")[0]
-                    module_version = import_module(parent_module).__version__
-                    d["@version"] = str(module_version)
-                except (AttributeError, ImportError):
-                    d["@version"] = None
+                d["@version"] = _module_version(
+                    o.__class__.__module__.partition(".")[0]
+                )
             return d
         except AttributeError:
             return json.JSONEncoder.default(self, o)
@@ -755,16 +839,23 @@ class MontyDecoder(json.JSONDecoder):
                     "torch",
                 }:
                     if modname == "datetime" and classname == "datetime":
+                        s = d["string"]
                         try:
-                            # Remove timezone info in the form of "+xx:00"
-                            dt = datetime.datetime.strptime(
-                                d["string"].split("+")[0], "%Y-%m-%d %H:%M:%S.%f"
-                            )
+                            # ``fromisoformat`` is ~5x faster than ``strptime``
+                            # and handles the optional fractional seconds and
+                            # ``+HH:MM`` timezone suffix natively.
+                            return datetime.datetime.fromisoformat(s)
                         except ValueError:
-                            dt = datetime.datetime.strptime(
-                                d["string"].split("+")[0], "%Y-%m-%d %H:%M:%S"
-                            )
-                        return dt
+                            # Fall back to the legacy parser for non-ISO inputs.
+                            s = s.split("+")[0]
+                            try:
+                                return datetime.datetime.strptime(
+                                    s, "%Y-%m-%d %H:%M:%S.%f"
+                                )
+                            except ValueError:
+                                return datetime.datetime.strptime(
+                                    s, "%Y-%m-%d %H:%M:%S"
+                                )
 
                     if modname == "uuid" and classname == "UUID":
                         return UUID(d["string"])
@@ -772,16 +863,15 @@ class MontyDecoder(json.JSONDecoder):
                     if modname == "pathlib" and classname == "Path":
                         return Path(d["string"])
 
-                    mod = __import__(modname, globals(), locals(), [classname], 0)
-                    if hasattr(mod, classname):
-                        cls_ = getattr(mod, classname)
+                    cls_ = _resolve_class(modname, classname)
+                    if cls_ is not None:
                         data = {k: v for k, v in d.items() if not k.startswith("@")}
                         if hasattr(cls_, "from_dict"):
                             return cls_.from_dict(data)
                         if issubclass(cls_, Enum):
                             return cls_(d["value"])
 
-                        try:
+                        if "pydantic" in sys.modules:
                             import pydantic
 
                             if issubclass(cls_, pydantic.BaseModel):
@@ -789,13 +879,9 @@ class MontyDecoder(json.JSONDecoder):
                                     k: self.process_decoded(v) for k, v in data.items()
                                 }
                                 return cls_(**d)
-                        except ImportError:
-                            pass
 
-                        if (
-                            dataclasses is not None
-                            and (not issubclass(cls_, MSONable))
-                            and dataclasses.is_dataclass(cls_)
+                        if (not issubclass(cls_, MSONable)) and dataclasses.is_dataclass(
+                            cls_
                         ):
                             d = {k: self.process_decoded(v) for k, v in data.items()}
                             return cls_(**d)  # type: ignore[operator]
@@ -838,11 +924,9 @@ class MontyDecoder(json.JSONDecoder):
                     import pandas as pd
 
                     if classname == "DataFrame":
-                        decoded_data = MontyDecoder().decode(d["data"])
-                        return pd.DataFrame(decoded_data)
+                        return pd.DataFrame(self.decode(d["data"]))
                     if classname == "Series":
-                        decoded_data = MontyDecoder().decode(d["data"])
-                        return pd.Series(decoded_data)
+                        return pd.Series(self.decode(d["data"]))
 
                 elif modname == "pint":
                     from pint import UnitRegistry
@@ -878,12 +962,17 @@ class MontyDecoder(json.JSONDecoder):
             Decoded object.
         """
         if bson is not None:
-            # need to pass `json_options` to ensure that datetimes are not
-            # converted by BSON
-            d = json_util.loads(s, json_options=json_util.JSONOptions(tz_aware=True))
+            # ``JSONOptions`` is moved to module scope so we do not allocate
+            # a fresh options object on every decode call.
+            d = json_util.loads(s, json_options=_BSON_JSON_OPTIONS)
         else:
             d = json.loads(s)
         return self.process_decoded(d)
+
+
+# Module-level decoder reused by ``MSONable.from_dict`` so we avoid the
+# allocation cost of constructing a fresh decoder on every key.
+_SHARED_DECODER = MontyDecoder()
 
 
 class MSONError(Exception):
@@ -965,7 +1054,8 @@ def jsanitize(
     if isinstance(obj, np.generic):
         return obj.item()
 
-    if _check_type(
+    # Fast path: skip the pandas type-check entirely if pandas isn't loaded.
+    if "pandas" in sys.modules and _check_type(
         obj,
         (
             "pandas.core.series.Series",
@@ -1022,7 +1112,7 @@ def jsanitize(
     if isinstance(obj, str):
         return obj
 
-    if _check_type(obj, "pydantic.main.BaseModel"):
+    if "pydantic" in sys.modules and _check_type(obj, "pydantic.main.BaseModel"):
         return jsanitize(
             MontyEncoder().default(obj),
             strict=strict,
@@ -1097,10 +1187,13 @@ def partial_monty_encode(
     -------
     str, dict
         The json encoding of the class and the name-object map if one is
-        required, otherwise None.
+        required, otherwise ``None`` (previously an empty ``{}`` was
+        returned, which caused ``save()`` to always write an empty
+        ``.pkl`` companion file).
     """
     encoder, encoded = _get_partial_json(
         obj=obj,
         json_kwargs=json_kwargs,
     )
-    return encoded, encoder._name_object_map
+    name_object_map = encoder._name_object_map
+    return encoded, (name_object_map or None)

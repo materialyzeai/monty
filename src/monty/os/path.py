@@ -27,8 +27,10 @@ def zpath(filename: PathLike) -> str:
             If filename is not found, the same filename is returned unchanged.
     """
     filename = str(filename)  # ensure we work with strings
+    # First entry is empty so we probe the unzipped form below; skip it when
+    # stripping suffixes since ``removesuffix("")`` is a no-op.
     exts = ("", ".gz", ".GZ", ".bz2", ".BZ2", ".z", ".Z")
-    for ext in exts:
+    for ext in exts[1:]:
         filename = filename.removesuffix(ext)
 
     for ext in exts:
@@ -74,11 +76,13 @@ def find_exts(
         # output.
         find_exts(".", "ps", include_dirs="output*"))
     """
-    exts = list_strings(exts)
+    # ``str.endswith`` accepts a tuple at the C level, which is several times
+    # faster than the equivalent ``any(... for ext in exts)`` comprehension.
+    _exts: tuple[str, ...] = tuple(list_strings(exts))
 
     # Handle file!
     if os.path.isfile(top):
-        return [os.path.abspath(top)] if any(top.endswith(ext) for ext in exts) else []
+        return [os.path.abspath(top)] if top.endswith(_exts) else []
 
     # Build shell-style wildcards.
     if exclude_dirs is not None:
@@ -106,7 +110,7 @@ def find_exts(
         paths.extend(
             os.path.join(dirpath, filename)
             for filename in filenames
-            if any(filename.endswith(ext) for ext in exts)
+            if filename.endswith(_exts)
         )
 
     return paths

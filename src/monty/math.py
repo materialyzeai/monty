@@ -15,8 +15,7 @@ def nCr(n: int, r: int) -> int:
     Returns:
         nCr.
     """
-    f = math.factorial
-    return int(f(n) / f(r) / f(n - r))
+    return math.comb(n, r)
 
 
 def nPr(n: int, r: int) -> int:
@@ -29,5 +28,4 @@ def nPr(n: int, r: int) -> int:
     Returns:
         nPr.
     """
-    f = math.factorial
-    return int(f(n) / f(n - r))
+    return math.perm(n, r)

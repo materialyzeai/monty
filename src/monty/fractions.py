@@ -18,10 +18,7 @@ def gcd(*numbers: int) -> int:
     Returns:
         int: Greatest common divisor of numbers.
     """
-    n: int = numbers[0]
-    for i in numbers:
-        n = math.gcd(n, i)
-    return n
+    return math.gcd(*numbers)
 
 
 def lcm(*numbers: int) -> int:
@@ -33,10 +30,7 @@ def lcm(*numbers: int) -> int:
     Returns:
         int: Lowest common multiple of numbers.
     """
-    n = 1
-    for i in numbers:
-        n = (i * n) // gcd(i, n)
-    return n
+    return math.lcm(*numbers)
 
 
 def gcd_float(numbers: Sequence[float], tol: float = 1e-8) -> float:
@@ -62,6 +56,6 @@ def gcd_float(numbers: Sequence[float], tol: float = 1e-8) -> float:
         return a
 
     n = numbers[0]
-    for i in numbers:
+    for i in numbers[1:]:
         n = pair_gcd_tol(n, i)
     return n

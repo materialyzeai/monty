@@ -42,10 +42,10 @@ def deprecated(
     """
 
     def craft_message(
-        old: Callable,
-        replacement: Callable | str,
+        old: Callable | type,
+        replacement: Callable | str | None,
         message: str,
-        deadline: datetime,
+        deadline: datetime | None,
     ) -> str:
         msg = f"{old.__name__} is deprecated"
 
@@ -76,9 +76,13 @@ def deprecated(
         return msg
 
     def deprecated_function_decorator(old: Callable) -> Callable:
+        # Craft the warning message once at decoration time; the inputs are
+        # all closed over and immutable, so there is no need to rebuild the
+        # string on every call (this used to dominate hot deprecated paths).
+        msg = craft_message(old, replacement, message, _deadline)
+
         @functools.wraps(old)
         def wrapped(*args, **kwargs):
-            msg = craft_message(old, replacement, message, _deadline)
             warnings.warn(msg, category=category, stacklevel=2)
             return old(*args, **kwargs)
 
@@ -91,9 +95,10 @@ def deprecated(
         else:
             original_init = cls.__init__  # type: ignore[misc]
 
+        msg = craft_message(cls, replacement, message, _deadline)
+
         @functools.wraps(original_init)
         def new_init(self, *args, **kwargs):
-            msg = craft_message(cls, replacement, message, _deadline)
             warnings.warn(msg, category=category, stacklevel=2)
             original_init(self, *args, **kwargs)
 

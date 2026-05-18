@@ -600,15 +600,16 @@ class TestJson:
 
         jsanitize(dt, strict=True)
 
-        # test timezone aware datetime API
+        # test timezone aware datetime API. The decoder now preserves the
+        # timezone via ``datetime.fromisoformat`` (the legacy ``strptime`` +
+        # ``split("+")`` path discarded it).
         created_at = datetime.datetime.now(tz=datetime.UTC)
         data = json.loads(json.dumps(created_at, cls=MontyEncoder))
 
         created_at_after = MontyDecoder().process_decoded(data)
 
-        assert str(created_at_after).rstrip("0") == str(created_at).rstrip(
-            "+00:00"
-        ).rstrip("0")
+        assert created_at_after == created_at
+        assert created_at_after.tzinfo is not None
 
     def test_uuid(self):
         from uuid import UUID, uuid4
@@ -1211,7 +1212,9 @@ class TestJson:
         is_m_d = json.loads(is_m_jsons)
         assert is_m_d["@class"] == "GoodMSONClass"
         assert is_m_d["a"] == 1
-        assert len(is_m_map) == 0
+        # Empty maps are now reported as ``None`` so ``save()`` no longer
+        # writes a stub ``.pkl`` companion file.
+        assert is_m_map is None
 
         not_m_jsons, not_m_map = partial_monty_encode(not_m)
         not_m_d = json.loads(not_m_jsons)
