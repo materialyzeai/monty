@@ -171,6 +171,31 @@ class TestSerial:
             raw = f.read()
         assert raw == "hello: world\n"
 
+    def test_yaml_thread_safe_roundtrip(self, tmp_dir):
+        """Concurrent dumpfn/loadfn from threads do not corrupt YAML state (issue #795)."""
+        import concurrent.futures
+
+        def worker(idx: int) -> dict:
+            fn = f"monte_test_{idx}.yaml"
+            payload = {
+                "obj": toyMsonable(a=idx, b=str(idx)),
+                "arr": np.array([float(idx), float(idx) + 1.0]),
+                "p": pathlib.Path(f"/tmp/{idx}"),
+            }
+            dumpfn(payload, fn)
+            return loadfn(fn)
+
+        n = 32
+        with concurrent.futures.ThreadPoolExecutor(max_workers=8) as ex:
+            results = list(ex.map(worker, range(n)))
+
+        for idx, result in enumerate(results):
+            assert isinstance(result["obj"], toyMsonable)
+            assert result["obj"].a == idx
+            assert result["obj"].b == str(idx)
+            np.testing.assert_array_equal(result["arr"], [float(idx), float(idx) + 1.0])
+            assert result["p"] == pathlib.Path(f"/tmp/{idx}")
+
     def test_yaml_user_typehandler(self, tmp_dir):
         """User-registered TypeHandlers participate in YAML round-trip."""
 
