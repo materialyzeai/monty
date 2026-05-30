@@ -1,8 +1,8 @@
-[![GitHub license](https://img.shields.io/github/license/materialsvirtuallab/monty)](https://github.com/materialsvirtuallab/monty/blob/main/LICENSE)
-[![Linting](https://github.com/materialsvirtuallab/monty/workflows/Linting/badge.svg)](https://github.com/materialsvirtuallab/monty/workflows/Linting/badge.svg)
-[![Testing](https://github.com/materialsvirtuallab/monty/workflows/Testing/badge.svg)](https://github.com/materialsvirtuallab/monty/workflows/Testing/badge.svg)
+[![GitHub license](https://img.shields.io/github/license/materialyzeai/monty)](https://github.com/materialyzeai/monty/blob/master/LICENSE.rst)
+[![Lint](https://github.com/materialyzeai/monty/actions/workflows/lint.yml/badge.svg)](https://github.com/materialyzeai/monty/actions/workflows/lint.yml)
+[![Test](https://github.com/materialyzeai/monty/actions/workflows/test.yml/badge.svg)](https://github.com/materialyzeai/monty/actions/workflows/test.yml)
 [![Downloads](https://static.pepy.tech/badge/monty)](https://pepy.tech/project/monty)
-[![codecov](https://codecov.io/gh/materialsvirtuallab/monty/branch/master/graph/badge.svg?token=QdfT2itxgu)](https://codecov.io/gh/materialsvirtuallab/monty)
+[![codecov](https://codecov.io/gh/materialyzeai/monty/branch/master/graph/badge.svg)](https://codecov.io/gh/materialyzeai/monty)
 
 # Monty: Python Made Even Easier
 
@@ -26,4 +26,4 @@ be a resource to collect the best solutions.
 
 Monty supports Python 3.9+.
 
-Please visit the [official docs](https://materialsvirtuallab.github.io/monty) for more information.
+Please visit the [official docs](https://materialyzeai.github.io/monty) for more information.
