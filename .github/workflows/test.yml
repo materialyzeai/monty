@@ -27,9 +27,10 @@ jobs:
         run: uv sync --all-extras
 
       - name: pytest
-        run: uv run pytest --cov=monty tests --color=yes
+        run: uv run pytest --cov=monty --cov-report=xml tests --color=yes
 
       - name: Upload coverage reports to Codecov
-        uses: codecov/codecov-action@v4
-        env:
-          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+        uses: codecov/codecov-action@v5
+        with:
+          files: ./coverage.xml
+          token: ${{ secrets.CODECOV_TOKEN }}
