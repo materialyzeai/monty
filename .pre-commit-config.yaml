@@ -1,5 +1,7 @@
 exclude: ^(docs|tests/test_files|tasks.py)
 
+default_install_hook_types: [pre-commit, commit-msg]
+
 ci:
   autoupdate_schedule: monthly
   skip: [mypy]
@@ -34,14 +36,6 @@ repos:
       - id: codespell
         stages: [pre-commit, commit-msg]
         exclude_types: [html]
-        additional_dependencies: [tomli] # needed to read pyproject.toml below py3.11
-
-  - repo: https://github.com/MarcoGorelli/cython-lint
-    rev: v0.19.0
-    hooks:
-      - id: cython-lint
-        args: [--no-pycodestyle]
-      - id: double-quote-cython-strings
 
   - repo: https://github.com/adamchainz/blacken-docs
     rev: 1.20.0
