@@ -30,6 +30,7 @@ jobs:
         run: uv run pytest --cov=monty --cov-report=xml tests --color=yes
 
       - name: Upload coverage reports to Codecov
+        if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.12'
         uses: codecov/codecov-action@v5
         with:
           files: ./coverage.xml
