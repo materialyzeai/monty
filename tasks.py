@@ -151,5 +151,4 @@ def release(ctx: Context, notest: bool = False, version: str = NEW_VER) -> None:
     release_github(ctx)
     ctx.run("python -m build", warn=True)
     ctx.run("python -m build --wheel", warn=True)
-    ctx.run("twine upload --skip-existing dist/*.whl", warn=True)
-    ctx.run("twine upload --skip-existing dist/*.tar.gz", warn=True)
+
