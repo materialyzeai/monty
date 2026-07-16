@@ -1101,6 +1101,20 @@ class TestJson:
             # AnotherClass from tests.test_json instead of tests.test_json2
             json.loads(json.dumps(d2), cls=MontyDecoder)
 
+    def test_missing_optional_module_falls_back_to_dict(self):
+        # A non-redirected class whose module is not importable (e.g. an
+        # optional dependency such as ``emmet`` referenced inside a serialized
+        # ComputedEntry) must fall back to the raw dict rather than crashing
+        # the whole decode.
+        d = {
+            "@module": "some.uninstalled.optional.package",
+            "@class": "SomeClass",
+            "foo": 1,
+            "bar": [1, 2, 3],
+        }
+        obj = json.loads(json.dumps(d), cls=MontyDecoder)
+        assert obj == d
+
     def test_redirect_settings_file(self):
         data = _load_redirect(os.path.join(TEST_DIR, "settings_for_test.yaml"))
         assert data == {

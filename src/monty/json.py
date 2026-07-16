@@ -1214,12 +1214,14 @@ class MontyDecoder(json.JSONDecoder):
         if isinstance(d, dict):
             modname: str | None
             classname: str | None
+            was_redirected = False
             if "@module" in d and "@class" in d:
                 modname = d["@module"]
                 classname = d["@class"]
                 if cls_redirect := MSONable.REDIRECT.get(modname, {}).get(classname):
                     classname = cls_redirect["@class"]
                     modname = cls_redirect["@module"]
+                    was_redirected = True
 
             elif "@module" in d and "@callable" in d:
                 modname = d["@module"]
@@ -1267,7 +1269,18 @@ class MontyDecoder(json.JSONDecoder):
                 else:
                     # Generic class resolution for MSONable / Enum / pydantic /
                     # non-MSONable dataclass classes.
-                    cls_ = _resolve_class(modname, classname)
+                    try:
+                        cls_ = _resolve_class(modname, classname)
+                    except ModuleNotFoundError:
+                        # A missing module for a non-redirected class means an
+                        # optional dependency is absent (e.g. ``emmet`` in a
+                        # serialized ComputedEntry). Fall back to the raw dict
+                        # rather than crashing the whole decode. A *redirected*
+                        # class pointing at a missing module is a genuine error,
+                        # so re-raise in that case.
+                        if was_redirected:
+                            raise
+                        cls_ = None
                     if cls_ is not None:
                         data = {k: v for k, v in d.items() if not k.startswith("@")}
                         if hasattr(cls_, "from_dict"):
