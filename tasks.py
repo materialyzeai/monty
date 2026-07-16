@@ -110,7 +110,7 @@ def release_github(ctx: Context, version: str = NEW_VER) -> None:
     desc = toks[1].strip()
     payload = {
         "tag_name": f"v{version}",
-        "target_commitish": "master",
+        "target_commitish": "main",
         "name": f"v{version}",
         "body": desc,
         "draft": False,
@@ -118,7 +118,7 @@ def release_github(ctx: Context, version: str = NEW_VER) -> None:
     }
 
     response = requests.post(
-        "https://api.github.com/repos/materialsvirtuallab/monty/releases",
+        "https://api.github.com/repos/materialyzeai/monty/releases",
         data=json.dumps(payload),
         headers={"Authorization": "token " + os.environ["GITHUB_RELEASES_TOKEN"]},
     )
