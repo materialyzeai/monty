@@ -103,7 +103,7 @@ def setver(ctx: Context) -> None:
 
 
 @task
-def release_github(ctx: Context) -> None:
+def release_github(ctx: Context, version: str = NEW_VER) -> None:
     with open("docs/changelog.md", encoding="utf-8") as f:
         contents = f.read()
     toks = re.split("##", contents)
@@ -149,7 +149,7 @@ def release(ctx: Context, notest: bool = False, version: str = NEW_VER) -> None:
     # update_doc(ctx)
     print(f"Release Version: {version}")
     commit(ctx)
-    release_github(ctx)
+    release_github(ctx, version=version)
     ctx.run("python -m build", warn=True)
     ctx.run("python -m build --wheel", warn=True)
 
