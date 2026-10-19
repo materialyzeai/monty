@@ -8,10 +8,14 @@ import sys
 import warnings
 from dataclasses import is_dataclass
 from datetime import datetime
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, ParamSpec, TypeVar
 
 if TYPE_CHECKING:
     from collections.abc import Callable
+
+
+_P = ParamSpec("_P")
+_R = TypeVar("_R")
 
 
 def deprecated(
@@ -161,7 +165,7 @@ class requires:
         self.message = message
         self.err_cls = err_cls
 
-    def __call__(self, _callable: Callable) -> Callable:
+    def __call__(self, _callable: Callable[_P, _R]) -> Callable[_P, _R]:
         """Wrap ``_callable`` so it raises when the condition is False.
 
         Args:
@@ -170,7 +174,7 @@ class requires:
         """
 
         @functools.wraps(_callable)
-        def decorated(*args, **kwargs):
+        def decorated(*args: _P.args, **kwargs: _P.kwargs) -> _R:
             if not self.condition:
                 raise self.err_cls(self.message)
             return _callable(*args, **kwargs)

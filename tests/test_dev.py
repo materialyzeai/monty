@@ -204,3 +204,26 @@ def test_requires():
 @pytest.mark.skipif(ultratb is None, reason="ipython is not installed")
 def test_install_except_hook():
     install_excepthook()
+
+
+def test_requires_preserves_signature_and_metadata():
+    @requires(True, "missing")
+    def calculate(value: int, *, scale: int = 2) -> int:
+        """A guarded calculation."""
+        return value * scale
+
+    assert calculate(3, scale=4) == 12
+    assert calculate.__name__ == "calculate"
+    assert calculate.__doc__ == "A guarded calculation."
+
+
+def test_requires_class_constructor():
+    @requires(True, "missing")
+    class Result:
+        def __init__(self, value: int, *, label: str):
+            self.value = value
+            self.label = label
+
+    result = Result(3, label="result")
+    assert result.value == 3
+    assert result.label == "result"
