@@ -1,6 +1,6 @@
 # Change log
 
-## Unreleased
+## 2026.10.21
 - Fix `return_if_raise` raising `TypeError` when given a tuple of exceptions (#808).
 - Fix `subprocess.Command` raising `UnboundLocalError` for list/tuple commands (#808).
 - Fix `loadfn` ignoring a custom `cls` decoder for YAML files (#808).
