@@ -73,14 +73,19 @@ class TestPath:
 
 class TestCd:
     def test_cd(self):
-        with cd(TEST_DIR):
+        with pytest.warns(FutureWarning, match="contextlib.chdir"), cd(TEST_DIR):
             assert os.path.exists("empty_file.txt")
         assert not os.path.exists("empty_file.txt")
 
     def test_cd_exception(self):
-        with cd(TEST_DIR):
-            assert os.path.exists("empty_file.txt")
-        assert not os.path.exists("empty_file.txt")
+        cwd = os.getcwd()
+        with (
+            pytest.warns(FutureWarning),
+            pytest.raises(RuntimeError),
+            cd(TEST_DIR),
+        ):
+            raise RuntimeError
+        assert os.getcwd() == cwd
 
 
 class TestMakedirs_p:
@@ -88,10 +93,12 @@ class TestMakedirs_p:
         self.test_dir_path = os.path.join(TEST_DIR, "test_dir")
 
     def test_makedirs_p(self):
-        makedirs_p(self.test_dir_path)
+        with pytest.warns(FutureWarning, match="exist_ok=True"):
+            makedirs_p(self.test_dir_path)
         assert os.path.exists(self.test_dir_path)
-        makedirs_p(self.test_dir_path)
-        with pytest.raises(OSError, match="exists"):
+        with pytest.warns(FutureWarning):
+            makedirs_p(self.test_dir_path)
+        with pytest.warns(FutureWarning), pytest.raises(OSError, match="exists"):
             makedirs_p(os.path.join(TEST_DIR, "3000_lines.txt"))
 
     def teardown_method(self):

@@ -3,9 +3,8 @@
 from __future__ import annotations
 
 import shlex
-import threading
 import traceback
-from subprocess import PIPE, Popen
+from subprocess import PIPE, Popen, TimeoutExpired
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -23,9 +22,7 @@ __date__ = "10/26/14"
 class Command:
     """Run a subprocess command in a separate thread with a timeout.
 
-    Based on jcollado's solution at
-    http://stackoverflow.com/questions/1191374/subprocess-with-timeout/4825933#4825933
-    and https://gist.github.com/kirpit/1306188.
+    The subprocess is terminated if it does not finish within the timeout.
 
     Attributes:
         retcode: Return code of the subprocess.
@@ -50,8 +47,8 @@ class Command:
         self.command: list[str] = (
             shlex.split(command) if isinstance(command, str) else list(command)
         )
-        self.process = None
-        self.retcode = None
+        self.process: Popen | None = None
+        self.retcode: int | None = None
         self.output, self.error = "", ""
         self.killed = False
 
@@ -59,7 +56,7 @@ class Command:
         return f"command: {self.command}, retcode: {self.retcode}"
 
     def run(self, timeout: float | None = None, **kwargs) -> Self:
-        """Run the command in a separate thread, waiting up to ``timeout`` seconds.
+        """Run the command, waiting up to ``timeout`` seconds.
 
         Args:
             timeout: Maximum seconds to wait before killing the subprocess.
@@ -70,30 +67,21 @@ class Command:
 
         """
 
-        def target(**kw):
-            try:
-                with Popen(self.command, **kw) as self.process:
-                    self.output, self.error = self.process.communicate()
-                    self.retcode = self.process.returncode
-            except Exception:
-                self.error = traceback.format_exc()
-                self.retcode = -1
+        kwargs.setdefault("stdout", PIPE)
+        kwargs.setdefault("stderr", PIPE)
 
-        # default stdout and stderr
-        if "stdout" not in kwargs:
-            kwargs["stdout"] = PIPE
-
-        if "stderr" not in kwargs:
-            kwargs["stderr"] = PIPE
-
-        # thread
-        thread = threading.Thread(target=target, kwargs=kwargs)
-        thread.start()
-        thread.join(timeout)
-
-        if thread.is_alive() and self.process is not None:
-            self.process.terminate()
-            self.killed = True
-            thread.join()
+        try:
+            with Popen(self.command, **kwargs) as proc:
+                self.process = proc
+                try:
+                    self.output, self.error = proc.communicate(timeout=timeout)
+                except TimeoutExpired:
+                    proc.terminate()
+                    self.output, self.error = proc.communicate()
+                    self.killed = True
+                self.retcode = proc.returncode
+        except Exception:
+            self.error = traceback.format_exc()
+            self.retcode = -1
 
         return self

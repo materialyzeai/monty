@@ -2,14 +2,13 @@
 
 from __future__ import annotations
 
-import errno
+import contextlib
 import os
-from contextlib import contextmanager
 from typing import TYPE_CHECKING
 
-if TYPE_CHECKING:
-    from collections.abc import Generator
+from monty.dev import deprecated
 
+if TYPE_CHECKING:
     from monty.shutil import PathLike
 
 __author__ = "Shyue Ping Ong"
@@ -20,11 +19,12 @@ __email__ = "ongsp@ucsd.edu"
 __date__ = "1/24/14"
 
 
-@contextmanager
-def cd(path: PathLike) -> Generator:
-    """Fabric-inspired context manager that temporarily changes directory.
+@deprecated(replacement="contextlib.chdir", deadline=(2028, 1, 1))
+def cd(path: PathLike) -> contextlib.chdir:
+    """Context manager that temporarily changes the working directory.
 
-    The working directory is restored on exit.
+    The working directory is restored on exit. Equivalent to
+    ``contextlib.chdir``.
 
     Examples:
         >>> with cd("/my/path/"):
@@ -34,28 +34,19 @@ def cd(path: PathLike) -> Generator:
         path: Path to ``cd`` to.
 
     """
-    cwd = os.getcwd()
-    os.chdir(path)
-    try:
-        yield
-    finally:
-        os.chdir(cwd)
+    return contextlib.chdir(path)
 
 
+@deprecated(replacement="os.makedirs(path, exist_ok=True)", deadline=(2028, 1, 1))
 def makedirs_p(path: PathLike, **kwargs) -> None:
     """Thread-safe ``os.makedirs`` that tolerates an existing directory.
 
-    Mirrors the behaviour of ``mkdir -p``.
+    Mirrors the behaviour of ``mkdir -p``. Equivalent to
+    ``os.makedirs(path, exist_ok=True)``.
 
     Args:
         path: Path of the directory to create.
         kwargs: Standard kwargs for ``os.makedirs``.
 
     """
-    try:
-        os.makedirs(path, **kwargs)
-    except OSError as exc:
-        if exc.errno == errno.EEXIST and os.path.isdir(path):
-            pass
-        else:
-            raise
+    os.makedirs(path, exist_ok=True, **kwargs)

@@ -24,12 +24,10 @@ from __future__ import annotations
 
 import contextlib
 import os
+import shutil
 
 with contextlib.suppress(Exception):
     import curses
-    import fcntl
-    import struct
-    import termios
 
 
 __all__ = ["colored", "cprint"]
@@ -180,35 +178,12 @@ def cprint_map(text: str, cmap: dict, **kwargs) -> None:
     print(colored_map(text, cmap), **kwargs)
 
 
-def get_terminal_size():
-    """Return the size of the terminal as (nrow, ncols).
+def get_terminal_size() -> tuple[int, int]:
+    """Return the size of the terminal as (nrows, ncols).
 
-    Based on:
-
-        http://stackoverflow.com/questions/566746/how-to-get-console-window-
-        width-in-python
+    Thin wrapper around ``shutil.get_terminal_size``, which honors the
+    ``LINES``/``COLUMNS`` environment variables, then queries the terminal
+    attached to ``sys.__stdout__``, and falls back to (25, 80).
     """
-    with contextlib.suppress(Exception):
-        rc = os.popen("stty size", "r").read().split()
-        return int(rc[0]), int(rc[1])
-
-    env = os.environ
-
-    def ioctl_GWINSZ(fd):
-        try:
-            return struct.unpack("hh", fcntl.ioctl(fd, termios.TIOCGWINSZ, "1234"))
-        except Exception:
-            return None
-
-    rc = ioctl_GWINSZ(0) or ioctl_GWINSZ(1) or ioctl_GWINSZ(2)
-
-    if not rc:
-        with contextlib.suppress(Exception):
-            fd = os.open(os.ctermid(), os.O_RDONLY)
-            rc = ioctl_GWINSZ(fd)
-            os.close(fd)
-
-    if not rc:
-        rc = (env.get("LINES", 25), env.get("COLUMNS", 80))
-
-    return int(rc[0]), int(rc[1])
+    size = shutil.get_terminal_size(fallback=(80, 25))
+    return size.lines, size.columns

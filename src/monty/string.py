@@ -21,7 +21,7 @@ def remove_non_ascii(s: str) -> str:
         String with all non-ASCII characters removed.
 
     """
-    return "".join(i for i in s if ord(i) < 128)
+    return s.encode("ascii", "ignore").decode("ascii")
 
 
 @deprecated(replacement="isinstance(s, str)", deadline=(2028, 1, 1))

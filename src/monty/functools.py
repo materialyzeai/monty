@@ -15,61 +15,6 @@ if TYPE_CHECKING:
     from typing import Any, Union
 
 
-class _HashedSeq(list):
-    """Cache key wrapper that ensures ``hash()`` is called at most once per element.
-
-    ``lru_cache`` hashes the key multiple times on a cache miss; storing the
-    precomputed hash avoids repeating that work.
-    """
-
-    __slots__ = ("hashvalue",)
-
-    def __init__(self, tup: tuple, hashfunc: Callable = hash) -> None:
-        """Initialize the hashed sequence.
-
-        Args:
-            tup: Tuple.
-            hashfunc: Hash function.
-
-        """
-        self[:] = tup
-        self.hashvalue: int = hashfunc(tup)
-
-    def __hash__(self) -> int:  # type: ignore[override]
-        return self.hashvalue
-
-
-def _make_key(
-    args: tuple,
-    kwds: dict,
-    typed: bool,
-    kwd_mark: tuple[object] = (object(),),
-    fasttypes=None,
-) -> Any:
-    """Make a cache key from optionally typed positional and keyword arguments.
-
-    The key is constructed in a way that is flat as possible rather than
-    as a nested structure that would take more memory.
-
-    If there is only a single argument and its data type is known to cache
-    its hash value, then that argument is returned without a wrapper.  This
-    saves space and improves lookup speed.
-    """
-    key = args
-    if kwds:
-        sorted_items = sorted(kwds.items())
-        key += kwd_mark
-        for item in sorted_items:
-            key += item
-    if typed:
-        key += tuple(type(v) for v in args)
-        if kwds:
-            key += tuple(type(v) for k, v in sorted_items)
-    elif len(key) == 1 and isinstance(key[0], fasttypes):
-        return key[0]
-    return _HashedSeq(key)
-
-
 class lazy_property:
     """Descriptor that turns a method into a lazily evaluated attribute.
 
