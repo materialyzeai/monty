@@ -162,7 +162,7 @@ def loadfn(
                 cls = kwargs.pop("cls", MontyDecoder)
                 loaded = _get_yaml().load(fp, *args, **kwargs)
                 if cls is not None:
-                    loaded = MontyDecoder().process_decoded(loaded)
+                    loaded = cls().process_decoded(loaded)
                 return loaded
 
             if fmt in {"json", "jsonl"}:
@@ -205,7 +205,7 @@ def dumpfn(
     if fmt == "mpk":
         if msgpack is None:
             raise RuntimeError(
-                "Loading of message pack files is not possible as msgpack-python is not installed."
+                "Dumping to message pack files is not possible as msgpack-python is not installed."
             )
         if "default" not in kwargs:
             kwargs["default"] = default
@@ -217,7 +217,7 @@ def dumpfn(
 
             if fmt == "yaml":
                 if YAML is None:
-                    raise RuntimeError("Loading of YAML files requires ruamel.yaml.")
+                    raise RuntimeError("Dumping to YAML files requires ruamel.yaml.")
                 _get_yaml().dump(obj, fp, *args, **kwargs)
             elif fmt in {"json", "jsonl"}:
                 if "cls" not in kwargs:

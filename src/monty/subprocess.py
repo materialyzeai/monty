@@ -8,9 +8,8 @@ import traceback
 from subprocess import PIPE, Popen
 from typing import TYPE_CHECKING
 
-from monty.string import is_string
-
 if TYPE_CHECKING:
+    from collections.abc import Sequence
     from typing import Optional, Self
 
 __author__ = "Matteo Giantomass"
@@ -40,16 +39,17 @@ class Command:
 
     """
 
-    def __init__(self, command: str):
+    def __init__(self, command: str | Sequence[str]):
         """Initialize the command.
 
         Args:
-            command: Command to execute.
+            command: Command to execute, either as a shell-like string (split
+                with ``shlex``) or as a sequence of arguments.
 
         """
-        if is_string(command):
-            _command: list[str] = shlex.split(command)
-        self.command = _command
+        self.command: list[str] = (
+            shlex.split(command) if isinstance(command, str) else list(command)
+        )
         self.process = None
         self.retcode = None
         self.output, self.error = "", ""

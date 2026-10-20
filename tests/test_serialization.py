@@ -9,7 +9,7 @@ import pathlib
 import numpy as np
 import pytest
 
-from monty.json import MSONable, TypeHandler, register, unregister
+from monty.json import MontyDecoder, MSONable, TypeHandler, register, unregister
 from monty.serialization import dumpfn, loadfn
 from monty.tempfile import ScratchDir
 
@@ -137,6 +137,50 @@ class TestSerial:
         raw = loadfn("monte_test.yaml", cls=None)
         assert isinstance(raw["items"][0], dict)
         assert raw["items"][0]["@class"] == "toyMsonable"
+
+    def test_yaml_custom_decoder_cls(self, tmp_dir):
+        """A user-supplied ``cls`` is honored for YAML, not replaced by MontyDecoder."""
+
+        used = []
+
+        class TrackingDecoder(MontyDecoder):
+            def __init__(self, *args, **kwargs):
+                used.append(True)
+                super().__init__(*args, **kwargs)
+
+        obj = toyMsonable(a=7, b="seven")
+        dumpfn(obj, "monte_test.yaml")
+        assert loadfn("monte_test.yaml", cls=TrackingDecoder) == obj
+        assert used
+
+    @pytest.mark.parametrize(
+        ("fn", "attr", "msg"),
+        [
+            ("monte_test.mpk", "msgpack", "Dumping to message pack"),
+            ("monte_test.yaml", "YAML", "Dumping to YAML"),
+        ],
+    )
+    def test_dumpfn_missing_backend(self, tmp_dir, monkeypatch, fn, attr, msg):
+        import monty.serialization
+
+        monkeypatch.setattr(monty.serialization, attr, None)
+        with pytest.raises(RuntimeError, match=msg):
+            dumpfn({"a": 1}, fn)
+
+    @pytest.mark.parametrize(
+        ("fn", "attr", "msg"),
+        [
+            ("monte_test.mpk", "msgpack", "Loading of message pack"),
+            ("monte_test.yaml", "YAML", "Loading of YAML"),
+        ],
+    )
+    def test_loadfn_missing_backend(self, tmp_dir, monkeypatch, fn, attr, msg):
+        import monty.serialization
+
+        dumpfn({"a": 1}, fn)
+        monkeypatch.setattr(monty.serialization, attr, None)
+        with pytest.raises(RuntimeError, match=msg):
+            loadfn(fn)
 
     def test_yaml_numpy_path_roundtrip(self, tmp_dir):
         """numpy arrays and pathlib paths round-trip through YAML."""

@@ -22,14 +22,20 @@ __date__ = "11/09/14"
 
 
 def index(a: list[float], x: float, atol: float | None = None) -> int:
-    """Locate the leftmost value exactly equal to x."""
-    i = bs.bisect_left(a, x)
-    if i != len(a):
-        if atol is None:
-            if a[i] == x:
-                return i
-        elif abs(a[i] - x) < atol:
+    """Locate the leftmost value equal to x.
+
+    If ``atol`` is given, return the leftmost value within ``atol`` of x
+    (``abs(a[i] - x) < atol``) instead of requiring exact equality.
+    """
+    if atol is None:
+        i = bs.bisect_left(a, x)
+        if i != len(a) and a[i] == x:
             return i
+        raise ValueError
+    # Skip values <= x - atol, which can never satisfy the strict tolerance.
+    i = bs.bisect_right(a, x - atol)
+    if i != len(a) and abs(a[i] - x) < atol:
+        return i
     raise ValueError
 
 
