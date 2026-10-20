@@ -150,6 +150,4 @@ def release(ctx: Context, notest: bool = False, version: str = NEW_VER) -> None:
     print(f"Release Version: {version}")
     commit(ctx)
     release_github(ctx, version=version)
-    ctx.run("python -m build", warn=True)
-    ctx.run("python -m build --wheel", warn=True)
-
+    ctx.run("uv build", warn=True)
