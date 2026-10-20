@@ -8,10 +8,15 @@ import sys
 import warnings
 from dataclasses import is_dataclass
 from datetime import datetime
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, ParamSpec, TypeVar, cast
 
 if TYPE_CHECKING:
     from collections.abc import Callable
+
+
+_P = ParamSpec("_P")
+_R = TypeVar("_R")
+_F = TypeVar("_F", bound="Callable[..., Any]")
 
 
 def deprecated(
@@ -19,7 +24,7 @@ def deprecated(
     message: str = "",
     deadline: tuple[int, int, int] | None = None,
     category: type[Warning] = FutureWarning,
-) -> Callable:
+) -> Callable[[_F], _F]:
     """Decorator to mark classes or functions as deprecated, with a possible replacement.
 
     Args:
@@ -74,14 +79,14 @@ def deprecated(
             msg += "\n" + message
         return msg
 
-    def deprecated_function_decorator(old: Callable) -> Callable:
+    def deprecated_function_decorator(old: Callable[_P, _R]) -> Callable[_P, _R]:
         # Craft the warning message once at decoration time; the inputs are
         # all closed over and immutable, so there is no need to rebuild the
         # string on every call (this used to dominate hot deprecated paths).
         msg = craft_message(old, replacement, message, _deadline)
 
         @functools.wraps(old)
-        def wrapped(*args, **kwargs):
+        def wrapped(*args: _P.args, **kwargs: _P.kwargs) -> _R:
             warnings.warn(msg, category=category, stacklevel=2)
             return old(*args, **kwargs)
 
@@ -111,11 +116,12 @@ def deprecated(
     # Convert deadline to `datetime` type
     _deadline: datetime | None = datetime(*deadline) if deadline is not None else None
 
-    def decorator(target: Callable) -> Callable:
+    def decorator(target: _F) -> _F:
         if inspect.isfunction(target):
-            return deprecated_function_decorator(target)
+            # inspect narrows to FunctionType, losing the original callable type.
+            return cast(_F, deprecated_function_decorator(target))
         if inspect.isclass(target):
-            return deprecated_class_decorator(target)
+            return cast(_F, deprecated_class_decorator(target))
         raise TypeError(
             "The @deprecated decorator can only be applied to classes or functions"
         )
@@ -161,7 +167,7 @@ class requires:
         self.message = message
         self.err_cls = err_cls
 
-    def __call__(self, _callable: Callable) -> Callable:
+    def __call__(self, _callable: Callable[_P, _R]) -> Callable[_P, _R]:
         """Wrap ``_callable`` so it raises when the condition is False.
 
         Args:
@@ -170,7 +176,7 @@ class requires:
         """
 
         @functools.wraps(_callable)
-        def decorated(*args, **kwargs):
+        def decorated(*args: _P.args, **kwargs: _P.kwargs) -> _R:
             if not self.condition:
                 raise self.err_cls(self.message)
             return _callable(*args, **kwargs)
