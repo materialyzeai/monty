@@ -617,6 +617,27 @@ class TestTryOrReturn:
         assert a.catch_exc_list() == "hello"
         assert a.return_none() is None
 
+    @pytest.mark.parametrize("exc", [KeyError, ValueError])
+    def test_exc_tuple(self, exc):
+        @return_if_raise((KeyError, ValueError), "hello")
+        def func():
+            raise exc
+
+        assert func() == "hello"
+
+    def test_disabled(self):
+        @return_if_raise(ValueError, "hello", disabled=True)
+        def func():
+            raise ValueError
+
+        with pytest.raises(ValueError):
+            func()
+
+    @pytest.mark.parametrize("bad", ["ValueError", 1, None])
+    def test_invalid_exception_tuple(self, bad):
+        with pytest.raises(TypeError, match="Wrong exception_tuple"):
+            return_if_raise(bad, "hello")
+
 
 class TestTimeout:
     @pytest.mark.skipif(platform.system() == "Windows", reason="Skip on windows")

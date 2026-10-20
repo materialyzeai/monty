@@ -166,9 +166,11 @@ def return_if_raise(
     # we need a tuple of exceptions.
     if isinstance(exception_tuple, list):
         exception_tuple = tuple(exception_tuple)
-    elif not isinstance(exception_tuple, tuple):
+    elif isinstance(exception_tuple, type) and issubclass(
+        exception_tuple, BaseException
+    ):
         exception_tuple = (exception_tuple,)
-    else:
+    elif not isinstance(exception_tuple, tuple):
         raise TypeError(f"Wrong exception_tuple {type(exception_tuple)}")
 
     def decorator(func):

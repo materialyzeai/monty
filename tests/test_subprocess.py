@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import pytest
+
 from monty.subprocess import Command
 
 
@@ -19,3 +21,18 @@ def test_command():
     sleep05.run(timeout=0.1)
     assert sleep05.retcode != 0
     assert sleep05.killed
+
+
+@pytest.mark.parametrize("command", [["sleep", "0.1"], ("sleep", "0.1")])
+def test_command_sequence(command):
+    com = Command(command)
+    assert com.command == ["sleep", "0.1"]
+    com.run(timeout=20)
+    assert com.retcode == 0
+    assert not com.killed
+
+
+def test_command_not_found():
+    com = Command("monty_nonexistent_executable").run(timeout=20)
+    assert com.retcode == -1
+    assert "Error" in com.error
