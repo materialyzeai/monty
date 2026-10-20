@@ -155,6 +155,60 @@ class TestLazy:
         assert Foo.bar.__doc__ == "bar func doc"
         assert "test_functools" in Foo.bar.__module__
 
+    def test_is_cached_property(self):
+        import functools
+
+        class Foo:
+            @lazy_property
+            def foo(self):
+                return 1
+
+        assert isinstance(Foo.foo, functools.cached_property)
+        assert Foo.foo.__qualname__.endswith("Foo.foo")
+
+    def test_alias_and_late_binding(self):
+        # Binding one descriptor to several names, or setting it on a class
+        # after creation, works and caches under the function name.
+        called = []
+
+        def foo(self):
+            called.append("foo")
+            return 1
+
+        class Foo:
+            bar = lazy_property(foo)
+            baz = bar
+
+        Foo.qux = lazy_property(foo)
+
+        f = Foo()
+        assert f.bar == f.baz == 1
+        assert f.__dict__ == {"foo": 1}
+        assert len(called) == 1
+        assert Foo().qux == 1
+
+    def test_private_attribute_in_subclass(self):
+        # The value is cached under the defining class's mangled name, so a
+        # subclass instance hits the cache.
+        called = []
+
+        class _Foo:
+            @lazy_property
+            def __foo(self):
+                called.append("foo")
+                return 1
+
+            def get_foo(self):
+                return self.__foo
+
+        class Bar(_Foo):
+            pass
+
+        b = Bar()
+        assert b.get_foo() == b.get_foo() == 1
+        assert len(called) == 1
+        assert "_Foo__foo" in b.__dict__
+
 
 class TestInvalidate:
     def test_invalidate_attribute(self):
@@ -648,6 +702,23 @@ class TestTimeout:
             raise AssertionError("Did not timeout!")
         except TimeoutError as ex:
             assert ex.message == "timeout!"
+
+    def test_timeout_error_is_builtin(self):
+        import builtins
+
+        err = TimeoutError("timeout!")
+        assert isinstance(err, builtins.TimeoutError)
+        assert err.message == str(err) == "timeout!"
+
+    @pytest.mark.skipif(platform.system() == "Windows", reason="Skip on windows")
+    def test_caught_by_builtin(self):
+        import builtins
+
+        with (
+            pytest.raises(builtins.TimeoutError, match="timeout!"),
+            timeout(1, "timeout!"),
+        ):
+            time.sleep(2)
 
 
 class TestProfMain:
