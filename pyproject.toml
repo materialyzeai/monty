@@ -110,6 +110,7 @@ ignore = [
   "PLR0912",  # too many branches
   "PLR0913",  # too many arguments
   "PLR0915",  # too many statements
+  "PLR0917",  # too many positional arguments (keyword-only would break public APIs)
   "PLW2901",  # redefined loop name (idiomatic in places)
   "PERF203",  # try/except inside loop
   "PLC0415",  # imports inside functions for optional deps
