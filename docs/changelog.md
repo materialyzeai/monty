@@ -1,5 +1,18 @@
 # Change log
 
+## 2026.10.21
+- Fix `return_if_raise` raising `TypeError` when given a tuple of exceptions (#808).
+- Fix `subprocess.Command` raising `UnboundLocalError` for list/tuple commands (#808).
+- Fix `loadfn` ignoring a custom `cls` decoder for YAML files (#808).
+- Fix `bisect.index(..., atol=...)` missing values just above an element; it now returns the leftmost value within tolerance (#808).
+- Fix `dumpfn` error messages for a missing msgpack/YAML backend (#808).
+- Preserve callable signatures and types in the `requires` and `deprecated` decorators (#806, @Andrew-S-Rosen).
+- Replace hand-rolled helpers with stdlib equivalents: `Command.run` uses `Popen.communicate(timeout=...)`, `termcolor.get_terminal_size` wraps `shutil.get_terminal_size`, `iuptri` uses `itertools.combinations`, `singleton` uses `functools.cache`. Remove unused `functools._HashedSeq`/`_make_key` (#809).
+- Deprecate `monty.os.cd` and `monty.os.makedirs_p` in favor of `contextlib.chdir` and `os.makedirs(path, exist_ok=True)` (#809).
+- `lazy_property` now subclasses `functools.cached_property`. Fixes private (name-mangled) lazy properties never caching on subclass instances, and aliased names recomputing on every access (#810).
+- `monty.functools.TimeoutError` now subclasses the built-in `TimeoutError` (and therefore `OSError`) (#810).
+- Update README: Python 3.11+ requirement, installation, optional extras and usage examples (#810).
+
 ## 2026.7.16
 - Add YAML round-trip support for MSONable and `TypeHandler`-registered types (numpy, pandas, pint, torch, uuid, pathlib, bson, and user-registered handlers). `dumpfn`/`loadfn` now treat YAML symmetrically with JSON via the `@module`/`@class` envelope, with a `cls=None` opt-out matching the JSON path (closes #587).
 - Fix `YAML` race condition by using a thread-local instance (closes #795).
