@@ -170,7 +170,14 @@ class TestSerial:
     @pytest.mark.parametrize(
         ("fn", "attr", "msg"),
         [
-            ("monte_test.mpk", "msgpack", "Loading of message pack"),
+            pytest.param(
+                "monte_test.mpk",
+                "msgpack",
+                "Loading of message pack",
+                marks=pytest.mark.skipif(
+                    msgpack is None, reason="msgpack-python not installed."
+                ),
+            ),
             ("monte_test.yaml", "YAML", "Loading of YAML"),
         ],
     )
