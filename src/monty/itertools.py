@@ -69,16 +69,12 @@ def iuptri(items: Iterable, diago: bool = True, with_inds: bool = False) -> Iter
     ij: (1, 1) mate: (1, 1)
 
     """
-    items = list(items)
-    n = len(items)
-    offset = 0 if diago else 1
-    for ii in range(n):
-        item1 = items[ii]
-        for jj in range(ii + offset, n):
-            if with_inds:
-                yield (ii, jj), (item1, items[jj])
-            else:
-                yield item1, items[jj]
+    pairs = itertools.combinations_with_replacement if diago else itertools.combinations
+    if not with_inds:
+        yield from pairs(items, 2)
+        return
+    for (ii, item1), (jj, item2) in pairs(enumerate(items), 2):
+        yield (ii, jj), (item1, item2)
 
 
 def ilotri(items: Iterable, diago: bool = True, with_inds: bool = False) -> Iterable:

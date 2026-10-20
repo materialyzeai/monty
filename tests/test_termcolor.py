@@ -72,3 +72,9 @@ class TestFunc:
     def test_stream_has_colors(self):
         # TODO: not a real test. Need to do a proper test.
         assert not stream_has_colours(sys.stdout)
+
+
+def test_get_terminal_size_env(monkeypatch):
+    monkeypatch.setenv("LINES", "42")
+    monkeypatch.setenv("COLUMNS", "123")
+    assert get_terminal_size() == (42, 123)

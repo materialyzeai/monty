@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import inspect
 import os
-from functools import wraps
+from functools import cache, wraps
 from typing import TYPE_CHECKING, TypeVar
 from weakref import WeakValueDictionary
 
@@ -23,12 +23,10 @@ def singleton(cls: type) -> Callable[[], Any]:
         ...         pass
 
     """
-    instances: dict[type, Any] = {}
 
+    @cache
     def getinstance() -> Any:
-        if cls not in instances:
-            instances[cls] = cls()
-        return instances[cls]
+        return cls()
 
     return getinstance
 

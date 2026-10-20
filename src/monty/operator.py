@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import contextlib
 import operator
 from typing import TYPE_CHECKING
 
@@ -29,9 +28,6 @@ def operator_from_str(op: str) -> Callable:
         "*": operator.mul,
         "%": operator.mod,
         "^": operator.xor,
+        "/": operator.truediv,
     }
-
-    with contextlib.suppress(AttributeError):
-        d["/"] = operator.truediv
-
     return d[op]

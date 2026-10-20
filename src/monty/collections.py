@@ -319,15 +319,11 @@ def dict2namedtuple(*args, **kwargs) -> tuple:
         >>> assert tpl[0] is tpl.foo and tpl[1] is tpl.bar
 
     Warnings:
-        - The order of the items in the namedtuple is not deterministic if
-          `kwargs` are used. namedtuples, however, should always be accessed
-          by attribute hence this behaviour should not be a serious problem.
-
-        - Don't use this function in code where memory and performance are
+        Don't use this function in code where memory and performance are
           crucial, since a dict is needed to instantiate the tuple!
 
     """
-    dct = collections.OrderedDict(*args)
+    dct = dict(*args)
     dct.update(**kwargs)
     return collections.namedtuple(
         typename="dict2namedtuple", field_names=list(dct.keys())

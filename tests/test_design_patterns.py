@@ -19,10 +19,16 @@ class TestSingleton:
         class A:
             pass
 
+        @singleton
+        class B:
+            pass
+
         a1 = A()
         a2 = A()
 
-        assert id(a1) == id(a2)
+        assert a1 is a2
+        assert B() is B()
+        assert B() is not a1
 
 
 @cached_class
