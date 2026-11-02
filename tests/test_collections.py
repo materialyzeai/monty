@@ -91,7 +91,11 @@ class TestControlledDict:
         assert val == 2 and "b" not in dct
 
         val = dct.popitem()
-        assert val == ("c", 3) and "c" not in dct
+        # popitem may be LIFO or FIFO depending on the Python version, we don't
+        # actually care for the test, so just check that it returned a valid
+        # item and that it was removed from the dictionary
+        assert (val == ("c", 3) and "c" not in dct) or (val == ("d", 4) and "d"
+                                                        not in dct)
 
         dct.clear()
         assert dct == {}
