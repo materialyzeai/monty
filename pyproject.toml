@@ -9,10 +9,9 @@ maintainers = [
 ]
 description = "Monty is the missing complement to Python."
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.12"
 classifiers = [
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
     "Programming Language :: Python :: 3.14",
@@ -50,7 +49,7 @@ include = ["monty", "monty.*"]
 
 [tool.black]
 line-length = 120
-target-version = ["py311"]
+target-version = ["py312"]
 include = '\.pyi?$'
 exclude = '''
 (
@@ -105,6 +104,10 @@ select = [
   "UP",     # pyupgrade
 ]
 ignore = [
+  # PEP 695 syntax (py312) changes runtime semantics of public aliases/generics; migrate deliberately.
+  "UP040", # non-pep695-type-alias
+  "UP046", # non-pep695-generic-class
+  "UP047", # non-pep695-generic-function
   "PLR2004",  # magic value comparison (too noisy)
   "PLR0911",  # too many return statements
   "PLR0912",  # too many branches

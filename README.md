@@ -17,7 +17,7 @@ ourselves repeatedly writing the same small utilities. Monty collects these
 into a single, well-tested, dependency-light library. Where the standard
 library has since caught up, Monty delegates to it.
 
-Monty supports Python 3.11+.
+Monty supports Python 3.12+.
 
 ## Installation
 
